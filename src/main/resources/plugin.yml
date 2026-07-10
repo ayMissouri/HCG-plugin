@@ -151,6 +151,10 @@ commands:
     usage: /<command> [player]
     aliases: [v]
     permission: hcg.vanish
+  graves:
+    description: Toggle death graves that store items and XP, force remove the grave you're looking at.
+    usage: /<command> [on|off|status|remove]
+    permission: hcg.graves
   npc:
     description: Create and manage player NPCs with skins, holograms, and click actions.
     usage: |
@@ -200,6 +204,7 @@ permissions:
       hcg.sudo: true
       hcg.vanish: true
       hcg.npc: true
+      hcg.graves: true
   hcg.help:
     default: op
   hcg.healthdecay:
@@ -261,4 +266,6 @@ permissions:
   hcg.vanish:
     default: op
   hcg.npc:
+    default: op
+  hcg.graves:
     default: op

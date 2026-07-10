@@ -91,6 +91,11 @@ public final class HcgCommand implements CommandExecutor, TabCompleter {
                     new Entry("/npc cooldown <name> <seconds>", "Delay between clicks per player."),
                     new Entry("/npc action <name> <trigger> add <type> <...>", "Add a click action (message, commands, sound, wait)."),
                     new Entry("/npc action <name> <trigger> <list|remove|clear>", "Manage a trigger's actions."))),
+            new Category("Graves", List.of(
+                    new Entry("/graves", "Open the graves settings menu."),
+                    new Entry("/graves on|off", "Store death drops and XP in a grave only the owner can open."),
+                    new Entry("/graves status", "Show whether graves are on and how many exist."),
+                    new Entry("/graves remove", "Force remove the grave you're looking at, spilling its contents."))),
             new Category("Admin Commands", List.of(
                     new Entry("/hcg help [category]", "Show this help menu."),
                     new Entry("/flyspeed <1-10>", "Set your fly speed (vanilla default is 1)."),

@@ -15,6 +15,7 @@ public final class HCGPlugin extends JavaPlugin {
     private HungerGamesManager hungerGamesManager;
     private NpcManager npcManager;
     private VanishManager vanishManager;
+    private GravesManager gravesManager;
 
     @Override
     public void onEnable() {
@@ -29,6 +30,7 @@ public final class HCGPlugin extends JavaPlugin {
         hungerGamesManager = new HungerGamesManager(this);
         npcManager = new NpcManager(this);
         vanishManager = new VanishManager(this);
+        gravesManager = new GravesManager(this);
 
         getServer().getPluginManager().registerEvents(new KillListener(this, decayManager), this);
         getServer().getPluginManager().registerEvents(new FreezeListener(freezeManager), this);
@@ -36,6 +38,7 @@ public final class HCGPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(lavaRaiseManager.burnTracker(), this);
         getServer().getPluginManager().registerEvents(new VolcanoListener(), this);
         getServer().getPluginManager().registerEvents(new VanishListener(vanishManager), this);
+        getServer().getPluginManager().registerEvents(new GravesListener(gravesManager), this);
         if (npcManager.isAvailable()) {
             getServer().getPluginManager().registerEvents(new NpcListener(npcManager), this);
         }
@@ -78,8 +81,10 @@ public final class HCGPlugin extends JavaPlugin {
         register("sudo", new SudoCommand());
         register("vanish", new VanishCommand(vanishManager));
         register("npc", new NpcCommand(this, npcManager));
+        register("graves", new GravesCommand(gravesManager));
 
         npcManager.load();
+        gravesManager.load();
 
         if (getConfig().getBoolean("enabled", true)) {
             decayManager.start();

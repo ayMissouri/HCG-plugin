@@ -118,6 +118,18 @@ hungergames:
   status-stages: "&6{stages} stage(s), {hold}s between stages, {shrink}s per shrink, {countdown}s starting countdown."
   status-spawns: "&6{count} spawn(s) set."
 
+graves:
+  enabled-broadcast: "&aGraves enabled, death drops are now stored in graves."
+  disabled-broadcast: "&aGraves disabled, deaths drop items normally again."
+  already-enabled: "&eGraves are already enabled."
+  not-enabled: "&eGraves are not enabled."
+  status: "&6Graves are {state}, {count} grave(s) currently placed."
+  created: "&6Your grave rests at &e{x}, {y}, {z}&6 ({world}). Only you can collect it."
+  collected: "&aGrave collected, {items} item(s) and {xp} XP restored."
+  not-yours: "&cThis grave belongs to {owner}, only they can collect it."
+  no-grave-in-sight: "&cYou're not looking at a grave (within {range} blocks)."
+  removed: "&aRemoved {owner}'s grave, its contents dropped on the floor."
+
 commands:
   heal:
     done: "&aHealed {who}."

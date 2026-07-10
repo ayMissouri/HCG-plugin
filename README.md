@@ -49,6 +49,12 @@ Implementation notes:
 
 Everything is configurable in-game (persisted to `config.yml`): `countdown`, `startsize`, `expandsize`, `finalsize`, `expandtime`, `stages`, `stagetime`, `shrinktime`, e.g. `/hg stages 8`.
 
+## Graves
+
+`/graves on|off` toggles death graves (off by default). When enabled, a player's items and full XP are stored in a player-head grave at their death location instead of dropping everywhere. Only the owner can collect their grave, right-click or break the head and everything goes back into their inventory (overflow drops at the grave). Graves are immune to explosions, pistons, and flowing liquids, and survive restarts via `graves.yml`.
+
+OPs can look at a grave and run `/graves remove` to force remove it, dropping its items and XP on the floor.
+
 ## NPCs
 
 `/npc` creates NPCs. They are packet-based so no real entity exists on the server, they can't be pushed, damaged, or killed, and they survive restarts via `npcs.yml`.

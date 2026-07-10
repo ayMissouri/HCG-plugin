@@ -76,6 +76,9 @@ npc:
   # You can get a free key from https://account.mineskin.org.
   mineskin-api-key: ""
 
+graves:
+  enabled: false
+
 random-drops:
   enabled: false
   # dynamic = fresh random drop on every break.
