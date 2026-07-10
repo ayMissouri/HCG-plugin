@@ -146,6 +146,11 @@ commands:
     description: Make a player say something or run a command.
     usage: /<command> <player> <message or /command>
     permission: hcg.sudo
+  vanish:
+    description: Toggle invisibility to other players.
+    usage: /<command> [player]
+    aliases: [v]
+    permission: hcg.vanish
   npc:
     description: Create and manage player NPCs with skins, holograms, and click actions.
     usage: |
@@ -193,6 +198,7 @@ permissions:
       hcg.spawner: true
       hcg.spawnmob: true
       hcg.sudo: true
+      hcg.vanish: true
       hcg.npc: true
   hcg.help:
     default: op
@@ -251,6 +257,8 @@ permissions:
   hcg.spawnmob:
     default: op
   hcg.sudo:
+    default: op
+  hcg.vanish:
     default: op
   hcg.npc:
     default: op

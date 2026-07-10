@@ -195,6 +195,12 @@ commands:
   sudo:
     forced-command: "&aForced {player} to run: {input}"
     forced-chat: "&aForced {player} to say: {input}"
+  vanish:
+    enabled-other: "&aVanished {player}."
+    disabled-other: "&aUnvanished {player}."
+    enabled-self: "&aYou are now invisible to other players."
+    disabled-self: "&aYou are visible again."
+    still-vanished: "&eYou are still vanished."
 
 npc:
   unavailable: "&cNPCs are not available, this server version isn't supported."

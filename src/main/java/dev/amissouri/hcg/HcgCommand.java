@@ -105,6 +105,7 @@ public final class HcgCommand implements CommandExecutor, TabCompleter {
                     new Entry("/heal [player|all]", "Heal yourself, a player, or everyone."),
                     new Entry("/feed [player|all]", "Restore hunger for yourself, a player, or everyone."),
                     new Entry("/god [player]", "Toggle invulnerability."),
+                    new Entry("/vanish [player]", "Toggle invisibility to other players."),
                     new Entry("/burn <player> [seconds]", "Set a player on fire."),
                     new Entry("/nickname [player] <text|reset>", "Set a display name; supports & colors."),
                     new Entry("/sudo <player> <msg or /cmd>", "Make a player chat or run a command."))),
