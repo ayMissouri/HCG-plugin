@@ -96,6 +96,11 @@ public final class HcgCommand implements CommandExecutor, TabCompleter {
                     new Entry("/graves on|off", "Store death drops and XP in a grave only the owner can open."),
                     new Entry("/graves status", "Show whether graves are on and how many exist."),
                     new Entry("/graves remove", "Force remove the grave you're looking at, spilling its contents."))),
+            new Category("Health Share", List.of(
+                    new Entry("/healthshare <players-per-team>", "Shuffle everyone into teams that share one health pool."),
+                    new Entry("/healthshare teams", "List the teams, their members, and their shared health."),
+                    new Entry("/healthshare status", "Show whether health share is running."),
+                    new Entry("/healthshare stop", "Disband the teams and stop sharing health."))),
             new Category("Admin Commands", List.of(
                     new Entry("/hcg help [category]", "Show this help menu."),
                     new Entry("/flyspeed <1-10>", "Set your fly speed (vanilla default is 1)."),

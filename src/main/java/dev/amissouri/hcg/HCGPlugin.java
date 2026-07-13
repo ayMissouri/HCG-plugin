@@ -16,6 +16,7 @@ public final class HCGPlugin extends JavaPlugin {
     private NpcManager npcManager;
     private VanishManager vanishManager;
     private GravesManager gravesManager;
+    private HealthShareManager healthShareManager;
 
     @Override
     public void onEnable() {
@@ -31,6 +32,7 @@ public final class HCGPlugin extends JavaPlugin {
         npcManager = new NpcManager(this);
         vanishManager = new VanishManager(this);
         gravesManager = new GravesManager(this);
+        healthShareManager = new HealthShareManager(this);
 
         getServer().getPluginManager().registerEvents(new KillListener(this, decayManager), this);
         getServer().getPluginManager().registerEvents(new FreezeListener(freezeManager), this);
@@ -39,6 +41,7 @@ public final class HCGPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new VolcanoListener(), this);
         getServer().getPluginManager().registerEvents(new VanishListener(vanishManager), this);
         getServer().getPluginManager().registerEvents(new GravesListener(gravesManager), this);
+        getServer().getPluginManager().registerEvents(new HealthShareListener(healthShareManager), this);
         if (npcManager.isAvailable()) {
             getServer().getPluginManager().registerEvents(new NpcListener(npcManager), this);
         }
@@ -82,6 +85,7 @@ public final class HCGPlugin extends JavaPlugin {
         register("vanish", new VanishCommand(vanishManager));
         register("npc", new NpcCommand(this, npcManager));
         register("graves", new GravesCommand(gravesManager));
+        register("healthshare", new HealthShareCommand(healthShareManager));
 
         npcManager.load();
         gravesManager.load();
@@ -107,6 +111,9 @@ public final class HCGPlugin extends JavaPlugin {
         }
         if (npcManager != null) {
             npcManager.shutdown();
+        }
+        if (healthShareManager != null) {
+            healthShareManager.shutdown();
         }
     }
 

@@ -155,6 +155,11 @@ commands:
     description: Toggle death graves that store items and XP, force remove the grave you're looking at.
     usage: /<command> [on|off|status|remove]
     permission: hcg.graves
+  healthshare:
+    description: Split all players into teams that share a single health pool.
+    usage: /<command> <players-per-team> | stop | status | teams
+    aliases: [hshare]
+    permission: hcg.healthshare
   npc:
     description: Create and manage player NPCs with skins, holograms, and click actions.
     usage: |
@@ -205,6 +210,7 @@ permissions:
       hcg.vanish: true
       hcg.npc: true
       hcg.graves: true
+      hcg.healthshare: true
   hcg.help:
     default: op
   hcg.healthdecay:
@@ -268,4 +274,6 @@ permissions:
   hcg.npc:
     default: op
   hcg.graves:
+    default: op
+  hcg.healthshare:
     default: op
