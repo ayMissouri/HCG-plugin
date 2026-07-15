@@ -2,6 +2,7 @@ package dev.amissouri.hcg.firstto;
 
 import java.util.List;
 
+import dev.amissouri.hcg.HcgScheduler;
 import dev.amissouri.hcg.HelpRegistry;
 import dev.amissouri.hcg.HelpRegistry.Entry;
 import dev.amissouri.hcg.Messages;
@@ -22,7 +23,7 @@ public final class FirstToPlugin extends JavaPlugin {
         saveDefaultConfig();
         Messages.registerDefaults(this);
 
-        firstToManager = new FirstToManager(this);
+        firstToManager = new FirstToManager(this, new HcgScheduler(this));
         getServer().getPluginManager().registerEvents(new FirstToListener(firstToManager), this);
         register("firstto", new FirstToCommand(firstToManager));
 

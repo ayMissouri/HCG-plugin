@@ -1,5 +1,7 @@
 package dev.amissouri.hcg.firstto;
+import dev.amissouri.hcg.HcgScheduler;
 import dev.amissouri.hcg.Messages;
+import dev.amissouri.hcg.Players;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.time.Duration;
@@ -8,15 +10,21 @@ import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
-import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -24,7 +32,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
-import org.bukkit.scheduler.BukkitTask;
 
 /**
  * First-to race rounds: a chest GUI rolls through items like a slot machine, lands on a random
@@ -79,23 +86,28 @@ public final class FirstToManager {
             Material.SPIRE_ARMOR_TRIM_SMITHING_TEMPLATE);
 
     private final JavaPlugin plugin;
+    private final HcgScheduler scheduler;
     private final Random random = new Random();
-    private boolean includeNether;
-    private boolean includeEnd;
-    private boolean tpSpawnOnWin;
+    private volatile boolean includeNether;
+    private volatile boolean includeEnd;
+    private volatile boolean tpSpawnOnWin;
 
-    private Mode mode;
-    private Material target;
-    private boolean rolling;
-    private boolean active;
-    private List<Material> pool;
-    private RollHolder holder;
-    private BukkitTask rollTask;
-    private BukkitTask scanTask;
-    private long startMillis;
+    private final Map<UUID, RollHolder> guis = new ConcurrentHashMap<>();
+    private final AtomicBoolean winClaimed = new AtomicBoolean();
 
-    public FirstToManager(JavaPlugin plugin) {
+    private volatile Mode mode;
+    private volatile Material target;
+    private volatile boolean rolling;
+    private volatile boolean active;
+    private volatile List<Material> pool;
+    private volatile ScheduledTask rollTask;
+    private volatile ScheduledTask scanTask;
+    private volatile long startMillis;
+    private volatile int round;
+
+    public FirstToManager(JavaPlugin plugin, HcgScheduler scheduler) {
         this.plugin = plugin;
+        this.scheduler = scheduler;
         this.includeNether = plugin.getConfig().getBoolean("first-to.include-nether", true);
         this.includeEnd = plugin.getConfig().getBoolean("first-to.include-end", true);
         this.tpSpawnOnWin = plugin.getConfig().getBoolean("first-to.tp-spawn-on-win", false);
@@ -149,49 +161,71 @@ public final class FirstToManager {
 
     /** Picks a target from the mode's pool and starts the slot-machine roll. False if the pool is empty. */
     public boolean start(Mode mode) {
-        pool = buildPool(mode);
-        if (pool.isEmpty()) {
+        List<Material> built = buildPool(mode);
+        if (built.isEmpty()) {
             return false;
         }
-        this.mode = mode;
-        this.target = pool.get(random.nextInt(pool.size()));
-        rolling = true;
-
-        holder = new RollHolder();
-        holder.inventory = Bukkit.createInventory(holder, 27, Messages.msg("firstto.gui-title"));
-        ItemStack filler = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
-        for (int slot = 0; slot < 27; slot++) {
-            holder.inventory.setItem(slot, filler);
-        }
-        holder.inventory.setItem(CENTER_SLOT - 9, new ItemStack(Material.YELLOW_STAINED_GLASS_PANE));
-        holder.inventory.setItem(CENTER_SLOT + 9, new ItemStack(Material.YELLOW_STAINED_GLASS_PANE));
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            player.openInventory(holder.inventory);
-        }
-        Messages.broadcast("firstto.rolling-broadcast");
-
-        rollTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
-            private int tick;
-            private int nextSwitch;
-            private int switchIndex;
-
-            @Override
-            public void run() {
-                if (tick++ < nextSwitch) {
-                    return;
-                }
-                if (switchIndex >= ROLL_DELAYS.length) {
-                    finishRoll();
-                    return;
-                }
-                holder.inventory.setItem(CENTER_SLOT,
-                        new ItemStack(pool.get(random.nextInt(pool.size()))));
-                float pitch = 0.8f + 1.0f * switchIndex / ROLL_DELAYS.length;
-                playSound(Sound.BLOCK_NOTE_BLOCK_HAT, pitch);
-                nextSwitch = tick + ROLL_DELAYS[switchIndex++];
+        scheduler.global(() -> {
+            if (rolling || active) {
+                return;
             }
-        }, 1, 1);
+            round++;
+            this.pool = built;
+            this.mode = mode;
+            this.target = built.get(random.nextInt(built.size()));
+            winClaimed.set(false);
+            rolling = true;
+            openGuis();
+            Messages.broadcast("firstto.rolling-broadcast");
+
+            rollTask = scheduler.globalTimer(new Runnable() {
+                private int tick;
+                private int nextSwitch;
+                private int switchIndex;
+
+                @Override
+                public void run() {
+                    if (tick++ < nextSwitch) {
+                        return;
+                    }
+                    if (switchIndex >= ROLL_DELAYS.length) {
+                        finishRoll();
+                        return;
+                    }
+                    setCenterItem(built.get(random.nextInt(built.size())));
+                    float pitch = 0.8f + 1.0f * switchIndex / ROLL_DELAYS.length;
+                    playSound(Sound.BLOCK_NOTE_BLOCK_HAT, pitch);
+                    nextSwitch = tick + ROLL_DELAYS[switchIndex++];
+                }
+            }, 1, 1);
+        });
         return true;
+    }
+
+    private void openGuis() {
+        guis.clear();
+        Component title = Messages.msg("firstto.gui-title");
+        ItemStack filler = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        Players.forEachOnline(scheduler, player -> {
+            RollHolder holder = new RollHolder();
+            holder.inventory = Bukkit.createInventory(holder, 27, title);
+            for (int slot = 0; slot < 27; slot++) {
+                holder.inventory.setItem(slot, filler);
+            }
+            holder.inventory.setItem(CENTER_SLOT - 9, new ItemStack(Material.YELLOW_STAINED_GLASS_PANE));
+            holder.inventory.setItem(CENTER_SLOT + 9, new ItemStack(Material.YELLOW_STAINED_GLASS_PANE));
+            guis.put(player.getUniqueId(), holder);
+            player.openInventory(holder.inventory);
+        });
+    }
+
+    private void setCenterItem(Material material) {
+        Players.forEachOnline(scheduler, player -> {
+            RollHolder holder = guis.get(player.getUniqueId());
+            if (holder != null) {
+                holder.inventory.setItem(CENTER_SLOT, new ItemStack(material));
+            }
+        });
     }
 
     private void finishRoll() {
@@ -199,111 +233,142 @@ public final class FirstToManager {
         rolling = false;
         active = true;
         startMillis = System.currentTimeMillis();
-        holder.inventory.setItem(CENTER_SLOT, new ItemStack(target));
+        setCenterItem(target);
         playSound(Sound.ENTITY_PLAYER_LEVELUP, 1f);
 
         Messages.broadcast(mode == Mode.CRAFT
                 ? "firstto.craft-target-broadcast" : "firstto.obtain-target-broadcast",
                 "item", prettyName(target));
 
-        RollHolder finished = holder;
-        Bukkit.getScheduler().runTaskLater(plugin, () -> closeGui(finished), CLOSE_DELAY_TICKS);
+        int myRound = round;
+        scheduler.globalDelayed(() -> {
+            if (round == myRound) {
+                closeGuis();
+            }
+        }, CLOSE_DELAY_TICKS);
 
         if (mode == Mode.OBTAIN) {
-            scanTask = Bukkit.getScheduler().runTaskTimer(plugin, this::scanInventories,
+            scanTask = scheduler.globalTimer(this::scanInventories,
                     SCAN_INTERVAL_TICKS, SCAN_INTERVAL_TICKS);
         }
     }
 
     /** Reopens the rolling GUI next tick so players can't close it while an item is being picked. */
     void handleGuiClose(Player player, Inventory inventory) {
+        RollHolder holder = guis.get(player.getUniqueId());
         if (!rolling || holder == null || inventory != holder.inventory) {
             return;
         }
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            if (rolling && holder != null && player.isOnline()) {
-                player.openInventory(holder.inventory);
+        scheduler.entity(player, () -> {
+            RollHolder current = guis.get(player.getUniqueId());
+            if (rolling && current != null && player.isOnline()) {
+                player.openInventory(current.inventory);
             }
         });
     }
 
-    /** Called by the listener on every craft; ends the round if it matches the target. */
     void handleCraft(Player player, Material crafted) {
         if (active && mode == Mode.CRAFT && crafted == target && isEligible(player)) {
-            win(player);
+            tryWin(player);
         }
     }
 
     private void scanInventories() {
-        for (Player player : Bukkit.getOnlinePlayers()) {
+        Material wanted = target;
+        if (wanted == null) {
+            return;
+        }
+        Players.forEachOnline(scheduler, player -> {
             if (!isEligible(player)) {
-                continue;
-            }
-            if (player.getInventory().contains(target) || player.getItemOnCursor().getType() == target) {
-                win(player);
                 return;
             }
-        }
+            if (player.getInventory().contains(wanted) || player.getItemOnCursor().getType() == wanted) {
+                tryWin(player);
+            }
+        });
     }
 
     private boolean isEligible(Player player) {
         return player.getGameMode() == GameMode.SURVIVAL || player.getGameMode() == GameMode.ADVENTURE;
     }
 
-    private void win(Player winner) {
-        String item = prettyName(target);
+    private void tryWin(Player winner) {
+        if (!active || !winClaimed.compareAndSet(false, true)) {
+            return;
+        }
+        String winnerName = winner.getName();
+        scheduler.global(() -> winNow(winnerName));
+    }
+
+    private void winNow(String winnerName) {
+        Material won = target;
+        if (!active || won == null) {
+            return;
+        }
+        String item = prettyName(won);
         String action = Messages.raw(actionKey());
         String time = formatDuration(System.currentTimeMillis() - startMillis);
+        boolean teleport = tpSpawnOnWin;
         clearRound();
         Messages.broadcast("firstto.winner-broadcast",
-                "player", winner.getName(), "action", action, "item", item, "time", time);
+                "player", winnerName, "action", action, "item", item, "time", time);
         showTitle("firstto.winner-title", "firstto.winner-subtitle",
-                "player", winner.getName(), "action", action, "item", item, "time", time);
+                "player", winnerName, "action", action, "item", item, "time", time);
         playSound(Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f);
-        if (tpSpawnOnWin) {
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                player.teleport(Bukkit.getWorlds().get(0).getSpawnLocation());
-            }
+        if (teleport) {
+            Location spawn = Bukkit.getWorlds().get(0).getSpawnLocation();
+            Players.forEachOnline(scheduler, player -> player.teleportAsync(spawn));
             Messages.broadcast("firstto.tp-broadcast");
         }
     }
 
     public void stop() {
-        clearRound();
+        scheduler.global(this::clearRound);
     }
 
     public void shutdown() {
-        clearRound();
+        cancelRollTask();
+        HcgScheduler.cancel(scanTask);
+        scanTask = null;
+        rolling = false;
+        active = false;
+        for (UUID id : guis.keySet()) {
+            Player player = Bukkit.getPlayer(id);
+            if (player != null) {
+                try {
+                    player.closeInventory();
+                } catch (Throwable ignored) {}
+            }
+        }
+        guis.clear();
     }
 
     private void clearRound() {
+        round++;
         cancelRollTask();
-        if (scanTask != null) {
-            scanTask.cancel();
-            scanTask = null;
-        }
+        HcgScheduler.cancel(scanTask);
+        scanTask = null;
         rolling = false;
         active = false;
         mode = null;
         target = null;
         pool = null;
-        if (holder != null) {
-            RollHolder gui = holder;
-            holder = null;
-            closeGui(gui);
-        }
+        closeGuis();
     }
 
     private void cancelRollTask() {
-        if (rollTask != null) {
-            rollTask.cancel();
-            rollTask = null;
-        }
+        HcgScheduler.cancel(rollTask);
+        rollTask = null;
     }
 
-    private void closeGui(RollHolder gui) {
-        for (HumanEntity viewer : List.copyOf(gui.inventory.getViewers())) {
-            viewer.closeInventory();
+    private void closeGuis() {
+        List<UUID> ids = List.copyOf(guis.keySet());
+        guis.clear();
+        for (UUID id : ids) {
+            Player player = Bukkit.getPlayer(id);
+            if (player != null) {
+                scheduler.entity(player, player::closeInventory);
+            }
         }
     }
 
@@ -411,6 +476,7 @@ public final class FirstToManager {
         return pretty.toString();
     }
 
+    /** Titles are a packet send and touch no region-owned state, so no fan-out needed. */
     private void showTitle(String titleKey, String subtitleKey, String... pairs) {
         Title title = Title.title(Messages.msg(titleKey, pairs), Messages.msg(subtitleKey, pairs), TITLE_TIMES);
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -418,9 +484,8 @@ public final class FirstToManager {
         }
     }
 
+    /** Unlike titles, this reads each player's own location, so it belongs on their region. */
     private void playSound(Sound sound, float pitch) {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            player.playSound(player.getLocation(), sound, 1f, pitch);
-        }
+        Players.forEachOnline(scheduler, player -> player.playSound(player.getLocation(), sound, 1f, pitch));
     }
 }

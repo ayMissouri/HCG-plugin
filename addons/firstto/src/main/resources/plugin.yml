@@ -2,6 +2,7 @@ name: HCGplugin-FirstTo
 version: '${project.version}'
 main: dev.amissouri.hcg.firstto.FirstToPlugin
 api-version: '1.21'
+folia-supported: true
 depend: [HCGplugin]
 description: First-to item race with a slot-machine roll, addon for HCGplugin.
 author: amissouri

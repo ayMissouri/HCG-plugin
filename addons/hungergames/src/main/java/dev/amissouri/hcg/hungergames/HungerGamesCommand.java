@@ -231,7 +231,7 @@ public final class HungerGamesCommand implements CommandExecutor, TabCompleter {
         }
         Collections.shuffle(spawns);
         for (int i = 0; i < players.size(); i++) {
-            players.get(i).teleport(spawns.get(i));
+            players.get(i).teleportAsync(spawns.get(i));
         }
         Messages.send(sender, "hungergames.scattered",
                 "players", String.valueOf(players.size()),

@@ -2,6 +2,7 @@ package dev.amissouri.hcg.hungergames;
 
 import java.util.List;
 
+import dev.amissouri.hcg.HcgScheduler;
 import dev.amissouri.hcg.HelpRegistry;
 import dev.amissouri.hcg.HelpRegistry.Entry;
 import dev.amissouri.hcg.Messages;
@@ -22,7 +23,7 @@ public final class HungerGamesPlugin extends JavaPlugin {
         saveDefaultConfig();
         Messages.registerDefaults(this);
 
-        hungerGamesManager = new HungerGamesManager(this);
+        hungerGamesManager = new HungerGamesManager(this, new HcgScheduler(this));
         register("hungergames", new HungerGamesCommand(hungerGamesManager));
 
         HelpRegistry.register(CATEGORY, 40, List.of(

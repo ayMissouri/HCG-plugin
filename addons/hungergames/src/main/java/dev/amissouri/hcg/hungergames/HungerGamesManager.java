@@ -1,5 +1,7 @@
 package dev.amissouri.hcg.hungergames;
+import dev.amissouri.hcg.HcgScheduler;
 import dev.amissouri.hcg.Messages;
+import dev.amissouri.hcg.Players;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.time.Duration;
@@ -7,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -14,7 +17,6 @@ import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitTask;
 
 /**
  * Hunger Games match sequence: a small starting border, an on-screen title countdown,
@@ -29,17 +31,20 @@ public final class HungerGamesManager {
             Title.Times.times(Duration.ZERO, Duration.ofMillis(1200), Duration.ofMillis(300));
 
     private final JavaPlugin plugin;
-    private BukkitTask task;
-    private World world;
-    private Phase phase;
-    private int counter;
-    private int stage;
-    private double previousSize;
-    private double previousCenterX;
-    private double previousCenterZ;
+    private final HcgScheduler scheduler;
 
-    public HungerGamesManager(JavaPlugin plugin) {
+    private volatile ScheduledTask task;
+    private volatile World world;
+    private volatile Phase phase;
+    private volatile int counter;
+    private volatile int stage;
+    private volatile double previousSize;
+    private volatile double previousCenterX;
+    private volatile double previousCenterZ;
+
+    public HungerGamesManager(JavaPlugin plugin, HcgScheduler scheduler) {
         this.plugin = plugin;
+        this.scheduler = scheduler;
     }
 
     // --- Spawn points, stored as "world;x;y;z;yaw;pitch" strings ---
@@ -196,39 +201,55 @@ public final class HungerGamesManager {
     /** Requires a border center; check borderCenter() != null first. */
     public void start(int countdownSeconds) {
         Location center = borderCenter();
-        world = center.getWorld();
-        WorldBorder border = world.getWorldBorder();
-        previousSize = border.getSize();
-        previousCenterX = border.getCenter().getX();
-        previousCenterZ = border.getCenter().getZ();
-        border.setCenter(center.getX(), center.getZ());
-        border.setSize(startSize());
-        phase = Phase.COUNTDOWN;
-        counter = countdownSeconds;
-        stage = 0;
-        task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 0L, 20L);
+        scheduler.global(() -> {
+            world = center.getWorld();
+            WorldBorder border = world.getWorldBorder();
+            previousSize = border.getSize();
+            previousCenterX = border.getCenter().getX();
+            previousCenterZ = border.getCenter().getZ();
+            border.setCenter(center.getX(), center.getZ());
+            border.setSize(startSize());
+            phase = Phase.COUNTDOWN;
+            counter = countdownSeconds;
+            stage = 0;
+            task = scheduler.globalTimer(this::tick, 1L, 20L);
+        });
     }
 
     /** Cancels the sequence and restores the border to its pre-game center and size. */
     public void stop() {
+        scheduler.global(this::stopNow);
+    }
+
+    private void stopNow() {
         if (task == null) {
             return;
         }
         cancelTask();
+        restoreBorder();
+    }
+
+    private void restoreBorder() {
         WorldBorder border = world.getWorldBorder();
         border.setCenter(previousCenterX, previousCenterZ);
         border.setSize(previousSize);
     }
 
     private void cancelTask() {
-        if (task != null) {
-            task.cancel();
-            task = null;
-        }
+        HcgScheduler.cancel(task);
+        task = null;
     }
 
     public void shutdown() {
-        stop();
+        if (task == null) {
+            return;
+        }
+        cancelTask();
+        try {
+            restoreBorder();
+        } catch (Throwable t) {
+            plugin.getLogger().warning("Could not restore the world border on shutdown: " + t);
+        }
     }
 
     private void tick() {
@@ -333,8 +354,6 @@ public final class HungerGamesManager {
     }
 
     private void playSound(Sound sound, float pitch) {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            player.playSound(player.getLocation(), sound, 1f, pitch);
-        }
+        Players.forEachOnline(scheduler, player -> player.playSound(player.getLocation(), sound, 1f, pitch));
     }
 }
