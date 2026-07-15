@@ -6,12 +6,12 @@ feature (Health Decay, Lava Raise, NPCs, ...) ships as its own addon JAR that de
 Install only the addons you want. All commands default to op-only.
 
 ## Modules
-
+<details>
+<summary>Extra modules/addon plugins</summary>
 Click an addon for its full docs (commands, config, permissions).
 
-| JAR | What it adds | Commands |
+| Addon | What it adds | Commands |
 | --- | --- | --- |
-| `HCGplugin` (base, **required**) | `/hcg` help, Admin/Item/World commands | fly, flyspeed, gmc/gms/gmsp/gma, tpall, freeze, invsee, heal, feed, god, vanish, burn, nickname, sudo, anvil, craft, enderchest, enchant, hat, name, lore, lightning, remove, spawner, spawnmob |
 | [`HCGplugin-HealthDecay`](addons/healthdecay/README.md) | Health decay game mode | `/healthdecay` |
 | [`HCGplugin-RandomDrops`](addons/randomdrops/README.md) | Random block drops game mode | `/randomdrops` |
 | [`HCGplugin-LavaRaise`](addons/lavaraise/README.md) | Rising lava event | `/lavaraise`, `/volcano` |
@@ -22,6 +22,7 @@ Click an addon for its full docs (commands, config, permissions).
 | [`HCGplugin-FirstTo`](addons/firstto/README.md) | First-to item race | `/firstto` |
 
 Each addon hard-depends on the base. Every module has its own config and messages in its own `plugins/<name>/` folder.
+</details>
 
 ## Building
 
@@ -49,8 +50,9 @@ Click a category or type `/hcg help <category> [page]` to see its commands, pagi
 These ship with the base `HCGplugin` and are always available. The game modes and other features live
 in the addon docs linked under [Modules](#modules) above.
 
-### Utility commands
-
+<details>
+<summary>Utility commands</summary>
+  
 | Command                                 | Effect                                                           |
 | --------------------------------------- | ---------------------------------------------------------------- |
 | `/hcg help [category] [page]`           | Categorized help menu with clickable navigation                  |
@@ -70,8 +72,11 @@ in the addon docs linked under [Modules](#modules) above.
 | `/nickname [player] <text\|reset>`      | Set a display name for chat + tab list; `&` colors               |
 | `/sudo <player> <msg or /cmd>`          | Make a player chat a message or run a command                    |
 
-### Item commands
-
+</details>
+  
+<details>
+<summary>Item commands</summary>
+  
 | Command                          | Effect                                                   |
 | -------------------------------- | -------------------------------------------------------- |
 | `/anvil`                         | Open a virtual anvil                                     |
@@ -82,7 +87,10 @@ in the addon docs linked under [Modules](#modules) above.
 | `/name <text\|reset>`            | Rename held item; `&` color codes                        |
 | `/lore <text\|reset>`            | Set held item lore; `&` colors, `\|` splits lines        |
 
-### World commands
+</details>
+
+<details>
+<summary>World commands</summary>
 
 | Command                           | Effect                                                                                     |
 | --------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -92,3 +100,5 @@ in the addon docs linked under [Modules](#modules) above.
 | `/remove mobs [hostile\|neutral]` | Remove all mobs, or only hostile / neutral+passive ones                                    |
 | `/spawner <mob>`                  | Change the mob type of the spawner you're looking at                                       |
 | `/spawnmob <mob> [amount]`        | Spawn mobs at your location (max 1000)                                                     |
+
+</details>
