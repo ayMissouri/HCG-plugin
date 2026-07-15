@@ -25,11 +25,9 @@ import org.bukkit.entity.Player;
 public final class RemoveCommand implements CommandExecutor, TabCompleter {
 
     private final HcgScheduler scheduler;
-    private final LoadedChunks chunks;
 
-    public RemoveCommand(HcgScheduler scheduler, LoadedChunks chunks) {
+    public RemoveCommand(HcgScheduler scheduler) {
         this.scheduler = scheduler;
-        this.chunks = chunks;
     }
 
     @Override
@@ -84,7 +82,7 @@ public final class RemoveCommand implements CommandExecutor, TabCompleter {
         }
 
         List<Job> jobs = Bukkit.getWorlds().stream()
-                .flatMap(world -> Arrays.stream(chunks.snapshot(world))
+                .flatMap(world -> Arrays.stream(LoadedChunks.snapshot(world))
                         .mapToObj(key -> new Job(world, LoadedChunks.chunkX(key), LoadedChunks.chunkZ(key))))
                 .toList();
         if (jobs.isEmpty()) {

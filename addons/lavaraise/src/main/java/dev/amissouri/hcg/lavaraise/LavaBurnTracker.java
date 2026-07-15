@@ -9,16 +9,18 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import dev.amissouri.hcg.AsyncSaver;
 import dev.amissouri.hcg.HcgScheduler;
-import org.bukkit.Bukkit;
+import dev.amissouri.hcg.LoadedChunks;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
@@ -36,16 +38,18 @@ public final class LavaBurnTracker implements Listener {
     private static final long SAVE_PERIOD_TICKS = 6000L;
 
     private final JavaPlugin plugin;
+    private final HcgScheduler scheduler;
     private final LavaRaiseManager manager;
-    private final Map<Integer, Set<Long>> byY = new HashMap<>();
+
+    private final Map<Long, Map<Integer, Set<Long>>> byChunk = new ConcurrentHashMap<>();
     private final AsyncSaver<byte[]> saver;
 
-    public LavaBurnTracker(JavaPlugin plugin, LavaRaiseManager manager) {
+    public LavaBurnTracker(JavaPlugin plugin, HcgScheduler scheduler, LavaRaiseManager manager) {
         this.plugin = plugin;
+        this.scheduler = scheduler;
         this.manager = manager;
         load();
-        this.saver = new AsyncSaver<>(new HcgScheduler(plugin), SAVE_PERIOD_TICKS,
-                this::snapshot, this::writeBytes);
+        this.saver = new AsyncSaver<>(scheduler, SAVE_PERIOD_TICKS, this::snapshot, this::writeBytes);
         this.saver.start();
     }
 
@@ -57,29 +61,70 @@ public final class LavaBurnTracker implements Listener {
         }
         if (manager.isBlockInLava(block)) {
             // Placed straight into the lava, burns immediately.
-            Bukkit.getScheduler().runTask(plugin, () -> {
+            scheduler.region(block.getLocation(), () -> {
                 if (block.getType().isBurnable() && manager.isBlockInLava(block)) {
                     burn(block);
                 }
             });
             return;
         }
-        byY.computeIfAbsent(block.getY(), k -> new HashSet<>()).add(pack(block.getX(), block.getZ()));
+        levels(chunkKeyOf(block)).computeIfAbsent(block.getY(), k -> ConcurrentHashMap.newKeySet())
+                .add(pack(block.getX(), block.getZ()));
         saver.markDirty();
     }
 
     @EventHandler(ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
-        Set<Long> set = byY.get(event.getBlock().getY());
-        if (set != null && set.remove(pack(event.getBlock().getX(), event.getBlock().getZ()))) {
+        Block block = event.getBlock();
+        Map<Integer, Set<Long>> levels = byChunk.get(chunkKeyOf(block));
+        if (levels == null) {
+            return;
+        }
+        Set<Long> set = levels.get(block.getY());
+        if (set != null && set.remove(pack(block.getX(), block.getZ()))) {
             saver.markDirty();
         }
     }
 
+    private static long chunkKeyOf(Block block) {
+        return LoadedChunks.key(block.getX() >> 4, block.getZ() >> 4);
+    }
+
+    private Map<Integer, Set<Long>> levels(long chunkKey) {
+        return byChunk.computeIfAbsent(chunkKey, k -> new ConcurrentHashMap<>());
+    }
+
     public void burnRange(int fromY, int toY) {
+        World world = manager.eventWorld();
+        for (Map.Entry<Long, Map<Integer, Set<Long>>> chunk : byChunk.entrySet()) {
+            int chunkX = LoadedChunks.chunkX(chunk.getKey());
+            int chunkZ = LoadedChunks.chunkZ(chunk.getKey());
+            Map<Integer, Set<Long>> levels = chunk.getValue();
+            if (!hasAnyIn(levels, fromY, toY)) {
+                continue;
+            }
+            scheduler.region(world, chunkX, chunkZ, () -> burnChunk(world, chunkX, chunkZ, levels, fromY, toY));
+        }
+    }
+
+    private static boolean hasAnyIn(Map<Integer, Set<Long>> levels, int fromY, int toY) {
+        for (int y = fromY; y <= toY; y++) {
+            Set<Long> set = levels.get(y);
+            if (set != null && !set.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void burnChunk(World world, int chunkX, int chunkZ,
+            Map<Integer, Set<Long>> levels, int fromY, int toY) {
+        if (!world.isChunkLoaded(chunkX, chunkZ)) {
+            return;
+        }
         boolean removedAny = false;
         for (int y = fromY; y <= toY; y++) {
-            Set<Long> set = byY.get(y);
+            Set<Long> set = levels.get(y);
             if (set == null || set.isEmpty()) {
                 continue;
             }
@@ -91,10 +136,7 @@ public final class LavaBurnTracker implements Listener {
                 if (!manager.inRegionXZ(x, z)) {
                     continue; // outside the event, keep tracking it
                 }
-                if (!manager.eventWorld().isChunkLoaded(x >> 4, z >> 4)) {
-                    continue; // not loaded, survives this event, stays tracked
-                }
-                Block block = manager.eventWorld().getBlockAt(x, y, z);
+                Block block = world.getBlockAt(x, y, z);
                 if (block.getType().isBurnable()) {
                     burn(block);
                 }
@@ -124,15 +166,20 @@ public final class LavaBurnTracker implements Listener {
 
     private byte[] snapshot() {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        try (DataOutputStream out = new DataOutputStream(bytes)) {
-            int count = byY.values().stream().mapToInt(Set::size).sum();
-            out.writeInt(count);
-            for (Map.Entry<Integer, Set<Long>> entry : byY.entrySet()) {
+        List<int[]> positions = new ArrayList<>();
+        for (Map<Integer, Set<Long>> levels : byChunk.values()) {
+            for (Map.Entry<Integer, Set<Long>> entry : levels.entrySet()) {
                 for (long key : entry.getValue()) {
-                    out.writeInt((int) (key >> 32));
-                    out.writeInt(entry.getKey());
-                    out.writeInt((int) key);
+                    positions.add(new int[]{(int) (key >> 32), entry.getKey(), (int) key});
                 }
+            }
+        }
+        try (DataOutputStream out = new DataOutputStream(bytes)) {
+            out.writeInt(positions.size());
+            for (int[] position : positions) {
+                out.writeInt(position[0]);
+                out.writeInt(position[1]);
+                out.writeInt(position[2]);
             }
         } catch (IOException e) {
             throw new IllegalStateException(e);
@@ -161,7 +208,9 @@ public final class LavaBurnTracker implements Listener {
                 int x = in.readInt();
                 int y = in.readInt();
                 int z = in.readInt();
-                byY.computeIfAbsent(y, k -> new HashSet<>()).add(pack(x, z));
+                levels(LoadedChunks.key(x >> 4, z >> 4))
+                        .computeIfAbsent(y, k -> ConcurrentHashMap.newKeySet())
+                        .add(pack(x, z));
             }
         } catch (IOException e) {
             plugin.getLogger().warning("Could not load placed-burnables.dat: " + e.getMessage());

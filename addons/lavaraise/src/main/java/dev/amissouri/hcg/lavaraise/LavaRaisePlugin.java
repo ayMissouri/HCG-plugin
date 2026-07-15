@@ -2,6 +2,7 @@ package dev.amissouri.hcg.lavaraise;
 
 import java.util.List;
 
+import dev.amissouri.hcg.HcgScheduler;
 import dev.amissouri.hcg.HelpRegistry;
 import dev.amissouri.hcg.HelpRegistry.Entry;
 import dev.amissouri.hcg.Messages;
@@ -23,10 +24,12 @@ public final class LavaRaisePlugin extends JavaPlugin {
         saveDefaultConfig();
         Messages.registerDefaults(this);
 
-        lavaRaiseManager = new LavaRaiseManager(this);
-        volcanoManager = new VolcanoManager(this);
+        HcgScheduler scheduler = new HcgScheduler(this);
+        lavaRaiseManager = new LavaRaiseManager(this, scheduler);
+        volcanoManager = new VolcanoManager(this, scheduler);
 
         getServer().getPluginManager().registerEvents(lavaRaiseManager.burnTracker(), this);
+        getServer().getPluginManager().registerEvents(new LavaRaiseListener(lavaRaiseManager), this);
         getServer().getPluginManager().registerEvents(new VolcanoListener(), this);
 
         register("lavaraise", new LavaRaiseCommand(lavaRaiseManager));

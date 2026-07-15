@@ -1,6 +1,9 @@
 package dev.amissouri.hcg.lavaraise;
+import dev.amissouri.hcg.HcgScheduler;
+import dev.amissouri.hcg.Players;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import java.util.List;
 import java.util.Random;
 
@@ -13,7 +16,6 @@ import org.bukkit.World;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
 import org.bukkit.metadata.FixedMetadataValue;
-import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
 public final class VolcanoManager {
@@ -26,14 +28,16 @@ public final class VolcanoManager {
 
     private final JavaPlugin plugin;
     private final Random random = new Random();
-    private BukkitTask task;
-    private BukkitTask scheduleTask;
+    private final HcgScheduler scheduler;
+    private volatile ScheduledTask task;
+    private volatile ScheduledTask scheduleTask;
     private long ticksLeft;
     private long prevDayTime = -1;
     private boolean shakeFlip;
 
-    public VolcanoManager(JavaPlugin plugin) {
+    public VolcanoManager(JavaPlugin plugin, HcgScheduler scheduler) {
         this.plugin = plugin;
+        this.scheduler = scheduler;
         if (isScheduled()) {
             startScheduleTask();
         }
@@ -109,15 +113,13 @@ public final class VolcanoManager {
     public void disableSchedule() {
         plugin.getConfig().set("volcano.schedule-enabled", false);
         plugin.saveConfig();
-        if (scheduleTask != null) {
-            scheduleTask.cancel();
-            scheduleTask = null;
-        }
+        HcgScheduler.cancel(scheduleTask);
+        scheduleTask = null;
     }
 
     private void startScheduleTask() {
         if (scheduleTask == null) {
-            scheduleTask = Bukkit.getScheduler().runTaskTimer(plugin, this::scheduleTick, 5L, 5L);
+            scheduleTask = scheduler.globalTimer(this::scheduleTick, 5L, 5L);
         }
     }
 
@@ -135,30 +137,24 @@ public final class VolcanoManager {
     }
 
     public boolean erupt(int seconds) {
-        if (isErupting() || center() == null) {
+        Location center = center();
+        if (isErupting() || center == null) {
             return false;
         }
         ticksLeft = seconds * 20L;
-        task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
+        task = scheduler.regionTimer(center, this::tick, 1L, 1L);
         return true;
     }
 
     public void stop() {
-        if (task != null) {
-            task.cancel();
-            task = null;
-        }
+        HcgScheduler.cancel(task);
+        task = null;
     }
 
     public void shutdown() {
-        if (task != null) {
-            task.cancel();
-            task = null;
-        }
-        if (scheduleTask != null) {
-            scheduleTask.cancel();
-            scheduleTask = null;
-        }
+        stop();
+        HcgScheduler.cancel(scheduleTask);
+        scheduleTask = null;
     }
 
     private void tick() {
@@ -207,18 +203,22 @@ public final class VolcanoManager {
             float sign = shakeFlip ? 1f : -1f;
             double radius = shakeRadius();
             double radiusSquared = radius * radius;
-            for (Player player : world.getPlayers()) {
-                double distSquared = player.getLocation().distanceSquared(center);
+            Location crater = center.clone();
+            Players.forEachOnline(scheduler, player -> {
+                Location at = player.getLocation();
+                if (!at.getWorld().equals(crater.getWorld())) {
+                    return;
+                }
+                double distSquared = at.distanceSquared(crater);
                 if (distSquared > radiusSquared) {
-                    continue;
+                    return;
                 }
                 float falloff = (float) (1.0 - Math.sqrt(distSquared) / radius);
-                float yaw = player.getLocation().getYaw()
-                        + sign * (0.4f + random.nextFloat() * 1.2f) * falloff;
-                float pitch = Math.clamp(player.getLocation().getPitch()
+                float yaw = at.getYaw() + sign * (0.4f + random.nextFloat() * 1.2f) * falloff;
+                float pitch = Math.clamp(at.getPitch()
                         + sign * (0.3f + random.nextFloat() * 0.8f) * falloff, -90f, 90f);
                 player.setRotation(yaw, pitch);
-            }
+            });
         }
     }
 }

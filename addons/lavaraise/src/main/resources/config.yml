@@ -13,6 +13,8 @@ lava-raise:
   burn-placed-blocks: true
   # When true, mobs in the lava burn and take damage like players.
   damage-mobs: false
+  # When true, a player who dies while the lava is up goes to spectator until the event ends.
+  spectate-on-death: true
   # The lava is client-side packets only (no real blocks).
   # blocks-per-tick: positions scanned and sent per tick across all players.
   # max-region: region cap in blocks across.

@@ -16,8 +16,7 @@ import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.event.world.WorldUnloadEvent;
 
 public final class LoadedChunks implements Listener {
-
-    private final Map<UUID, Set<Long>> byWorld = new ConcurrentHashMap<>();
+    private static final Map<UUID, Set<Long>> byWorld = new ConcurrentHashMap<>();
 
     void seed(java.util.logging.Logger logger) {
         for (World world : Bukkit.getWorlds()) {
@@ -48,11 +47,11 @@ public final class LoadedChunks implements Listener {
         keys(event.getWorld()).remove(key(event.getChunk().getX(), event.getChunk().getZ()));
     }
 
-    public long[] snapshot(World world) {
+    public static long[] snapshot(World world) {
         return keys(world).stream().mapToLong(Long::longValue).toArray();
     }
 
-    private Set<Long> keys(World world) {
+    private static Set<Long> keys(World world) {
         return byWorld.computeIfAbsent(world.getUID(), k -> ConcurrentHashMap.newKeySet());
     }
 

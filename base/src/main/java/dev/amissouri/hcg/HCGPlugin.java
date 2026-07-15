@@ -58,7 +58,7 @@ public final class HCGPlugin extends JavaPlugin {
         register("name", itemText);
         register("nickname", new NicknameCommand(scheduler));
         register("lightning", new LightningCommand(scheduler));
-        register("remove", new RemoveCommand(scheduler, loadedChunks));
+        register("remove", new RemoveCommand(scheduler));
         register("spawner", new SpawnerCommand());
         register("spawnmob", new SpawnMobCommand());
         register("sudo", new SudoCommand(scheduler));

@@ -1,9 +1,20 @@
 # HCGplugin
 
-PaperMC 1.21.x & 26.x plugin split into a **base plugin** plus **installable feature addons**. The base
-provides the `/hcg` help menu and the always-on Admin, Item, and World commands; each game mode or
-feature (Health Decay, Lava Raise, NPCs, ...) ships as its own addon JAR that depends on the base.
-Install only the addons you want. All commands default to op-only.
+Minecraft 1.21.x & 26.x plugin split into a **base plugin** plus **installable feature addons**. The base provides the `/hcg` help menu and the always-on Admin, Item, and World commands; each game mode or feature (Health Decay, Lava Raise, NPCs, ...) ships as its own addon JAR that depends on the base. Install the addons you want. All commands default to op-only.
+
+## Server software
+
+Runs on **Paper** (including **Purpur**, **Pufferfish**, **Leaves**), and **Folia**. Spigot and CraftBukkit are not supported as of yet.
+
+Two things Folia can't do, because its own docs list them as unimplemented:
+
+| | On Folia |
+| --- | --- |
+| `/invsee <player>`, `/enderchest <player>` | One live inventory can't be shared across two region threads. |
+| Health Share team name colours | Off. [Folia considers all scoreboard API broken](https://github.com/PaperMC/Folia); shared health itself works normally. |
+
+Everything else behaves identically. Lava Raise's `damage-mobs` only burns mobs in chunks near a player
+on Folia, since mobs elsewhere aren't ticking.
 
 ## Modules
 <details>

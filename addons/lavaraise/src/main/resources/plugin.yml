@@ -2,6 +2,7 @@ name: HCGplugin-LavaRaise
 version: '${project.version}'
 main: dev.amissouri.hcg.lavaraise.LavaRaisePlugin
 api-version: '1.21'
+folia-supported: true
 depend: [HCGplugin]
 description: Daily rising lava event plus volcano eruptions, addon for HCGplugin.
 author: amissouri
