@@ -159,3 +159,11 @@ tweaks:
     setting-set: "&a{setting} set to {value}."
     bad-value: "&cUnknown value '{input}', use one of: {options}."
     reloaded: "&aFarming settings reloaded from config.yml."
+
+  voidtotem:
+    name: "Void Totem"
+    summary: "A held totem saves you from the void and floats you back up."
+    saved: "&6Your totem pulled you back from the void!"
+    setting-set: "&a{setting} set to {value}."
+    bad-value: "&cUnknown value '{input}', use one of: {options}."
+    reloaded: "&aVoid Totem settings reloaded from config.yml."

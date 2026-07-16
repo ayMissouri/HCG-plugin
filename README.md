@@ -110,25 +110,20 @@ blocks touching each other, corners included, so coal next to iron stays two vei
 | `enchant` | Only a tool carrying the Veinminer enchant (and sneaking too, unless `sneak off`) |
 | `both`    | Either one                                                                        |
 
-**The enchant.** Veinminer is *not* a real registry enchantment — registering one needs a Paper
-bootstrapper and a `paper-plugin.yml`, which would change how the addons resolve the base's shared
-classes. It is a persistent tag on the item plus a lore line, so it survives chests, restarts and
-copies exactly like a real enchant, but it does **not** transfer through anvils, enchanted books or
-grindstones. Enchanting tables roll it on the tools listed under `enchant.tools` in `config.yml`
-(the six pickaxes by default) when the chosen option costs at least `enchant.min-level`.
+**Costs.** 
 
-**Costs.** The block you actually hit is broken by vanilla, which charges its one durability point and
+The block you actually hit is broken by vanilla, which charges its one durability point and
 its exhaustion as always. Everything below is only about the *extra* blocks:
 
-- `durability: per-block` — one more point per extra ore. If the tool gives out mid-vein, the vein
+- `durability: per-block`, one more point per extra ore. If the tool gives out mid-vein, the vein
   stops there.
-- `durability: single` — nothing extra, so the whole vein costs the one point vanilla already took,
+- `durability: single`, nothing extra, so the whole vein costs the one point vanilla already took,
   as if you had broken a single block.
-- `hunger: enabled` — adds `hunger.exhaustion-per-block` (default 0.05) of exhaustion per extra
-  block. Creative and spectator pay neither cost.
+- `hunger: enabled`, adds `hunger.exhaustion-per-block` (default 0.05) of exhaustion per extra
+  block.
 
 Fortune and Silk Touch apply to the whole vein, since each block is broken with the tool in hand. Every
-extra block fires a normal block-break event, so region-protection plugins get their say on each one.
+extra block fires a normal block-break event, so region-protection plugins should still work.
 `hcg.veinminer.use` decides who it works for and defaults to **everyone** (`shift` mode is meant as a
 server-wide rule); negate it to carve players out. The `/tweaks` and `/veinminer` commands stay op-only.
 

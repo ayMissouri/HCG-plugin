@@ -21,6 +21,9 @@ import dev.amissouri.hcg.tweaks.TweaksManager;
 import dev.amissouri.hcg.tweaks.VeinminerCommand;
 import dev.amissouri.hcg.tweaks.VeinminerListener;
 import dev.amissouri.hcg.tweaks.VeinminerTweak;
+import dev.amissouri.hcg.tweaks.VoidTotemCommand;
+import dev.amissouri.hcg.tweaks.VoidTotemListener;
+import dev.amissouri.hcg.tweaks.VoidTotemTweak;
 import dev.amissouri.hcg.tweaks.XpTpCommand;
 import dev.amissouri.hcg.tweaks.XpTpListener;
 import dev.amissouri.hcg.tweaks.XpTpTweak;
@@ -115,6 +118,9 @@ public final class HCGPlugin extends JavaPlugin {
         XpTpTweak xpTp = new XpTpTweak(this);
         tweaks.register(xpTp);
 
+        VoidTotemTweak voidTotem = new VoidTotemTweak(this);
+        tweaks.register(voidTotem);
+
         getServer().getPluginManager().registerEvents(new TweaksGuiListener(gui), this);
         getServer().getPluginManager().registerEvents(
                 new VeinminerListener(veinminer, veinEnchant, scheduler), this);
@@ -123,6 +129,7 @@ public final class HCGPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new FarmingListener(farming), this);
         getServer().getPluginManager().registerEvents(mobHealthListener, this);
         getServer().getPluginManager().registerEvents(new XpTpListener(xpTp, scheduler), this);
+        getServer().getPluginManager().registerEvents(new VoidTotemListener(voidTotem, scheduler), this);
         mobHealthListener.startAll();
 
         register("tweaks", new TweaksCommand(tweaks, gui));
@@ -131,6 +138,7 @@ public final class HCGPlugin extends JavaPlugin {
         register("farming", new FarmingCommand(farming, gui));
         register("mobhealth", new MobHealthCommand(mobHealth, gui));
         register("xptp", new XpTpCommand(xpTp, gui));
+        register("voidtotem", new VoidTotemCommand(voidTotem, gui));
     }
 
     @Override
@@ -191,7 +199,14 @@ public final class HCGPlugin extends JavaPlugin {
                 new Entry("/xptp blocks <on|off>",
                         "Also send XP from mined blocks (ores, spawners) to the miner."),
                 new Entry("/xptp players <on|off>",
-                        "Also send a slain player's dropped XP to their killer.")));
+                        "Also send a slain player's dropped XP to their killer."),
+                new Entry("/voidtotem", "Open the Void Totem chest menu (a held totem saves you from the void)."),
+                new Entry("/voidtotem level <1-10>",
+                        "How strongly the levitation floats you up out of the void."),
+                new Entry("/voidtotem consume <on|off>",
+                        "Use up the totem on each save, or make a held totem unlimited protection."),
+                new Entry("/voidtotem effect <on|off>",
+                        "Play the totem's pop animation and sound when it saves you.")));
 
         HelpRegistry.register("Admin Commands", HelpRegistry.ORDER_ADMIN, List.of(
                 new Entry("/hcg help [category]", "Show this help menu."),

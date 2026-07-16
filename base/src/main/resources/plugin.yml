@@ -32,6 +32,10 @@ commands:
     description: Manage the XP Teleport tweak.
     usage: /<command> [on|off|mending|sound|blocks|players|gui|reload]
     permission: hcg.xptp
+  voidtotem:
+    description: Manage the Void Totem tweak.
+    usage: /<command> [on|off|level|consume|effect|gui|reload]
+    permission: hcg.voidtotem
   farming:
     description: Manage the Farming tweak.
     usage: /<command> [on|off|harvest|replant|xp|xpamount|hoe|durability|radius|sound|twerk|twerkradius|twerkchance|gui|reload]
@@ -173,6 +177,11 @@ permissions:
     default: op
   hcg.xptp.use:
     description: Lets a player's kills and mining send their XP straight to them while the tweak is on.
+    default: true
+  hcg.voidtotem:
+    default: op
+  hcg.voidtotem.use:
+    description: Lets a player's held totem save them from the void while the tweak is on.
     default: true
   hcg.farming:
     default: op

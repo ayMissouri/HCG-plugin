@@ -164,3 +164,16 @@ tweaks:
       chance: 15
       # Shortest time (ms) between grows for one player.
       cooldown-ms: 350
+
+  # A held Totem of Undying saves you from the void
+  voidtotem:
+    enabled: false
+
+    # Strength of the levitation that floats you up out of the void (1-10).
+    level: 5
+    # Use up the totem when it saves you.
+    consume: true
+    # Play the totem's pop animation and sound when it saves you.
+    effect: true
+    # How long the rescue levitation lasts.
+    max-seconds: 30
