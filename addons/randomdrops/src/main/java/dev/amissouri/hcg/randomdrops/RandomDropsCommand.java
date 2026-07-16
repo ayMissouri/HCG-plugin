@@ -1,22 +1,19 @@
 package dev.amissouri.hcg.randomdrops;
 import dev.amissouri.hcg.Messages;
+import dev.amissouri.hcg.menu.Menu;
+import dev.amissouri.hcg.menu.MenuItem;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
 
-/**
- * /randomdrops [on|off|status|mode <dynamic|static>|reroll], bare command opens a clickable settings menu.
- */
 public final class RandomDropsCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS =
@@ -33,19 +30,14 @@ public final class RandomDropsCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
-            showMenu(sender);
+            openOrStatus(sender);
             return true;
         }
         switch (args[0].toLowerCase()) {
-            case "menu" -> showMenu(sender);
+            case "menu" -> openOrStatus(sender);
             case "on" -> turnOn(sender);
             case "off" -> turnOff(sender);
-            case "status" -> Messages.send(sender, "randomdrops.status",
-                    "state", manager.isEnabled() ? "enabled" : "disabled",
-                    "mode", manager.mode().name().toLowerCase(),
-                    "enchants", manager.isEnchanted() ? "on" : "off",
-                    "mobs", manager.isMobsEnabled() ? "on" : "off",
-                    "pool", String.valueOf(manager.poolSize()));
+            case "status" -> sendStatus(sender);
             case "mode" -> {
                 if (!setModeFromArg(sender, args)) {
                     Messages.send(sender, "randomdrops.mode-usage");
@@ -65,28 +57,62 @@ public final class RandomDropsCommand implements CommandExecutor, TabCompleter {
                 manager.reroll();
                 Messages.send(sender, "randomdrops.rerolled");
             }
-            case "set" -> {
-                if (args.length >= 2) {
-                    switch (args[1].toLowerCase()) {
-                        case "on" -> turnOn(sender);
-                        case "off" -> turnOff(sender);
-                        case "mode" -> setModeFromArg(sender, args);
-                        case "enchants" -> setEnchantsFromArg(sender, args);
-                        case "mobs" -> setMobsFromArg(sender, args);
-                        case "reroll" -> {
-                            manager.reroll();
-                            Messages.send(sender, "randomdrops.rerolled-short");
-                        }
-                        default -> { }
-                    }
-                }
-                showMenu(sender);
-            }
             default -> {
                 return false;
             }
         }
         return true;
+    }
+
+    private void openOrStatus(CommandSender sender) {
+        if (sender instanceof Player player) {
+            openMenu(player);
+        } else {
+            sendStatus(sender);
+        }
+    }
+
+    private void openMenu(Player player) {
+        Menu.open(player, "Random Drops", menu -> {
+            menu.header(MenuItem.toggle("Random Drops", Material.DROPPER,
+                    List.of("Every block break drops a random item.",
+                            manager.poolSize() + " items in the pool."),
+                    manager::isEnabled,
+                    on -> {
+                        manager.setEnabled(on);
+                        if (on) {
+                            Messages.broadcastOps("randomdrops.enabled-broadcast",
+                                    "mode", manager.mode().name().toLowerCase());
+                        } else {
+                            Messages.broadcastOps("randomdrops.disabled-broadcast");
+                        }
+                    }));
+
+            menu.add(MenuItem.choice("Mode", Material.COMPARATOR,
+                    List.of("DYNAMIC: every break rolls fresh.",
+                            "STATIC: each block keeps one drop."),
+                    () -> manager.mode() == RandomDropsManager.Mode.STATIC ? "STATIC" : "DYNAMIC",
+                    forward -> manager.setMode(manager.mode() == RandomDropsManager.Mode.STATIC
+                            ? RandomDropsManager.Mode.DYNAMIC : RandomDropsManager.Mode.STATIC)));
+
+            menu.add(MenuItem.toggle("Enchanted drops", Material.ENCHANTED_BOOK,
+                    List.of("Give each drop 1-3 random enchantments."),
+                    manager::isEnchanted, manager::setEnchanted));
+
+            menu.add(MenuItem.toggle("Mob drops", Material.ZOMBIE_HEAD,
+                    List.of("Every mob death drops a random item too."),
+                    manager::isMobsEnabled, manager::setMobsEnabled));
+
+            if (manager.mode() == RandomDropsManager.Mode.STATIC) {
+                menu.add(MenuItem.button("Reroll drop table", NamedTextColor.LIGHT_PURPLE,
+                        Material.BONE_MEAL,
+                        List.of("Randomize every block's fixed drop."),
+                        clicker -> {
+                            manager.reroll();
+                            Messages.send(clicker, "randomdrops.rerolled");
+                        }));
+            }
+        });
     }
 
     private boolean setModeFromArg(CommandSender sender, String[] args) {
@@ -158,87 +184,13 @@ public final class RandomDropsCommand implements CommandExecutor, TabCompleter {
         Messages.broadcastOps("randomdrops.disabled-broadcast");
     }
 
-    private void showMenu(CommandSender sender) {
-        boolean enabled = manager.isEnabled();
-        boolean isStatic = manager.mode() == RandomDropsManager.Mode.STATIC;
-
-        sender.sendMessage(Component.text("--- ", NamedTextColor.DARK_GRAY)
-                .append(Component.text("Random Drops", NamedTextColor.GOLD, TextDecoration.BOLD))
-                .append(Component.text(" ---", NamedTextColor.DARK_GRAY)));
-
-        Component toggle = enabled
-                ? button("[Disable]", NamedTextColor.RED, "/randomdrops set off",
-                        "Blocks drop normally again")
-                : button("[Enable]", NamedTextColor.GREEN, "/randomdrops set on",
-                        "Every block break drops a random item");
-        sender.sendMessage(Component.text("Status: ", NamedTextColor.GRAY)
-                .append(enabled
-                        ? Component.text("ENABLED", NamedTextColor.GREEN, TextDecoration.BOLD)
-                        : Component.text("DISABLED", NamedTextColor.RED, TextDecoration.BOLD))
-                .append(Component.text("  "))
-                .append(toggle));
-
-        Component dynamicButton = isStatic
-                ? button("[Dynamic]", NamedTextColor.AQUA, "/randomdrops set mode dynamic",
-                        "Every break rolls a fresh random drop")
-                : Component.text("[Dynamic]", NamedTextColor.GOLD, TextDecoration.BOLD);
-        Component staticButton = isStatic
-                ? Component.text("[Static]", NamedTextColor.GOLD, TextDecoration.BOLD)
-                : button("[Static]", NamedTextColor.AQUA, "/randomdrops set mode static",
-                        "Each block type always drops the same random item");
-        sender.sendMessage(Component.text("Mode: ", NamedTextColor.GRAY)
-                .append(Component.text(isStatic ? "STATIC" : "DYNAMIC", NamedTextColor.YELLOW,
-                        TextDecoration.BOLD))
-                .append(Component.text("  "))
-                .append(dynamicButton)
-                .append(Component.text(" "))
-                .append(staticButton));
-
-        boolean enchants = manager.isEnchanted();
-        Component enchantToggle = enchants
-                ? button("[Disable]", NamedTextColor.RED, "/randomdrops set enchants off",
-                        "Drops come without enchantments")
-                : button("[Enable]", NamedTextColor.GREEN, "/randomdrops set enchants on",
-                        "Every drop gets 1-3 random enchantments");
-        sender.sendMessage(Component.text("Enchants: ", NamedTextColor.GRAY)
-                .append(enchants
-                        ? Component.text("ON", NamedTextColor.GREEN, TextDecoration.BOLD)
-                        : Component.text("OFF", NamedTextColor.RED, TextDecoration.BOLD))
-                .append(Component.text("  "))
-                .append(enchantToggle));
-
-        boolean mobsOn = manager.isMobsEnabled();
-        Component mobToggle = mobsOn
-                ? button("[Disable]", NamedTextColor.RED, "/randomdrops set mobs off",
-                        "Mobs drop their normal loot again")
-                : button("[Enable]", NamedTextColor.GREEN, "/randomdrops set mobs on",
-                        "Every mob death drops a random item");
-        sender.sendMessage(Component.text("Mob drops: ", NamedTextColor.GRAY)
-                .append(mobsOn
-                        ? Component.text("ON", NamedTextColor.GREEN, TextDecoration.BOLD)
-                        : Component.text("OFF", NamedTextColor.RED, TextDecoration.BOLD))
-                .append(Component.text("  "))
-                .append(mobToggle));
-
-        if (isStatic) {
-            sender.sendMessage(Component.text("Drop table: ", NamedTextColor.GRAY)
-                    .append(Component.text("each block type has one fixed drop  ", NamedTextColor.YELLOW))
-                    .append(button("[Reroll]", NamedTextColor.LIGHT_PURPLE, "/randomdrops set reroll",
-                            "Randomize the whole drop table again")));
-        }
-
-        sender.sendMessage(Component.text(
-                (isStatic
-                        ? "Same block, same drop, until you reroll. "
-                        : "Every break rolls a fresh random drop. ")
-                        + manager.poolSize() + " survival-obtainable items in the pool.",
-                NamedTextColor.GRAY));
-    }
-
-    private Component button(String label, NamedTextColor color, String command, String hover) {
-        return Component.text(label, color, TextDecoration.BOLD)
-                .hoverEvent(HoverEvent.showText(Component.text(hover)))
-                .clickEvent(ClickEvent.runCommand(command));
+    private void sendStatus(CommandSender sender) {
+        Messages.send(sender, "randomdrops.status",
+                "state", manager.isEnabled() ? "enabled" : "disabled",
+                "mode", manager.mode().name().toLowerCase(),
+                "enchants", manager.isEnchanted() ? "on" : "off",
+                "mobs", manager.isMobsEnabled() ? "on" : "off",
+                "pool", String.valueOf(manager.poolSize()));
     }
 
     @Override

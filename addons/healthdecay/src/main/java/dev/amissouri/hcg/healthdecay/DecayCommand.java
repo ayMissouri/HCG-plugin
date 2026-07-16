@@ -1,19 +1,19 @@
 package dev.amissouri.hcg.healthdecay;
 import dev.amissouri.hcg.HcgText;
 import dev.amissouri.hcg.Messages;
+import dev.amissouri.hcg.menu.Menu;
+import dev.amissouri.hcg.menu.MenuItem;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
 
 public final class DecayCommand implements CommandExecutor, TabCompleter {
 
@@ -37,23 +37,14 @@ public final class DecayCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
-            showMenu(sender);
+            openOrStatus(sender);
             return true;
         }
         switch (args[0].toLowerCase()) {
-            case "menu" -> showMenu(sender);
+            case "menu" -> openOrStatus(sender);
             case "on" -> turnOn(sender);
             case "off" -> turnOff(sender);
-            case "status" -> {
-                Messages.send(sender, "healthdecay.status-state",
-                        "state", decayManager.isRunning() ? "running" : "stopped");
-                Messages.send(sender, "healthdecay.status-health",
-                        "current", HcgText.formatHearts(decayManager.currentMaxHp()),
-                        "floor", HcgText.formatHearts(decayManager.minimumHp()));
-                Messages.send(sender, "healthdecay.status-rate",
-                        "amount", HcgText.formatHearts(decayManager.decayAmountHp()),
-                        "seconds", String.valueOf(plugin.getConfig().getLong("decay.interval-seconds", 60)));
-            }
+            case "status" -> sendStatus(sender);
             case "restore" -> {
                 restore();
                 Messages.send(sender, "healthdecay.restored");
@@ -72,15 +63,68 @@ public final class DecayCommand implements CommandExecutor, TabCompleter {
                     Messages.send(sender, "healthdecay.amount-set", "hearts", String.valueOf(hearts));
                 }
             }
-            case "set" -> {
-                handleSet(sender, args);
-                showMenu(sender);
-            }
             default -> {
                 return false;
             }
         }
         return true;
+    }
+
+    private void openOrStatus(CommandSender sender) {
+        if (sender instanceof Player player) {
+            openMenu(player);
+        } else {
+            sendStatus(sender);
+        }
+    }
+
+    private void openMenu(Player player) {
+        Menu.open(player, "Health Decay", menu -> {
+            menu.header(MenuItem.toggle("Health Decay", Material.WITHER_ROSE,
+                    List.of("Max health ticks down over time.",
+                            "A confirmed PvP kill restores everyone."),
+                    decayManager::isRunning,
+                    on -> {
+                        if (on) {
+                            decayManager.start();
+                            Messages.broadcastOps("healthdecay.start-broadcast",
+                                    "hearts", HcgText.formatHearts(decayManager.minimumHp()));
+                        } else {
+                            decayManager.stop();
+                            Messages.broadcastOps("healthdecay.stop-broadcast");
+                        }
+                    }));
+
+            menu.add(MenuItem.display("Max health", NamedTextColor.RED, Material.GOLDEN_APPLE,
+                    List.of(HcgText.formatHearts(decayManager.currentMaxHp()) + " / "
+                                    + HcgText.formatHearts(decayManager.maximumHp()) + " hearts",
+                            "Floor: " + HcgText.formatHearts(decayManager.minimumHp()) + " hearts")));
+
+            menu.add(MenuItem.button("Restore health", NamedTextColor.GREEN, Material.TOTEM_OF_UNDYING,
+                    List.of("Reset everyone to full and", "restart the decay timer."),
+                    clicker -> {
+                        restore();
+                        Messages.send(clicker, "healthdecay.restored");
+                    }));
+
+            menu.add(MenuItem.stepper("Decay interval", Material.CLOCK,
+                    List.of("Seconds between each decay tick."),
+                    () -> plugin.getConfig().getLong("decay.interval-seconds", 60) + "s",
+                    forward -> {
+                        long interval = plugin.getConfig().getLong("decay.interval-seconds", 60);
+                        setInterval(forward ? interval + INTERVAL_STEP
+                                : Math.max(INTERVAL_MIN, interval - INTERVAL_STEP));
+                    }));
+
+            menu.add(MenuItem.stepper("Decay amount", Material.REDSTONE,
+                    List.of("Hearts lost per decay tick."),
+                    () -> fmt(plugin.getConfig().getDouble("decay.amount-hearts", 0.5)) + " heart(s)",
+                    forward -> {
+                        double amount = plugin.getConfig().getDouble("decay.amount-hearts", 0.5);
+                        setAmount(forward ? Math.min(AMOUNT_MAX, amount + AMOUNT_STEP)
+                                : Math.max(AMOUNT_MIN, amount - AMOUNT_STEP));
+                    }));
+        });
     }
 
     private void turnOn(CommandSender sender) {
@@ -118,103 +162,15 @@ public final class DecayCommand implements CommandExecutor, TabCompleter {
         plugin.saveConfig();
     }
 
-    private void handleSet(CommandSender sender, String[] args) {
-        if (args.length < 2) {
-            return;
-        }
-        switch (args[1].toLowerCase()) {
-            case "on" -> turnOn(sender);
-            case "off" -> turnOff(sender);
-            case "restore" -> {
-                restore();
-                Messages.send(sender, "healthdecay.restored");
-            }
-            case "interval" -> {
-                if (args.length >= 3) {
-                    try {
-                        setInterval(Math.max(1, Long.parseLong(args[2])));
-                    } catch (NumberFormatException ignored) {
-                    }
-                }
-            }
-            case "amount" -> {
-                if (args.length >= 3) {
-                    try {
-                        setAmount(Math.clamp(Double.parseDouble(args[2]), AMOUNT_MIN, AMOUNT_MAX));
-                    } catch (NumberFormatException ignored) {
-                    }
-                }
-            }
-            default -> { }
-        }
-    }
-
-    private void showMenu(CommandSender sender) {
-        boolean running = decayManager.isRunning();
-        long interval = plugin.getConfig().getLong("decay.interval-seconds", 60);
-        double amount = plugin.getConfig().getDouble("decay.amount-hearts", 0.5);
-
-        sender.sendMessage(Component.text("--- ", NamedTextColor.DARK_GRAY)
-                .append(Component.text("Health Decay", NamedTextColor.GOLD, TextDecoration.BOLD))
-                .append(Component.text(" ---", NamedTextColor.DARK_GRAY)));
-
-        Component toggle = running
-                ? button("[Stop]", NamedTextColor.RED, "/healthdecay set off",
-                        "Stop the decay and restore everyone")
-                : button("[Start]", NamedTextColor.GREEN, "/healthdecay set on",
-                        "Start the decay game mode");
-        sender.sendMessage(Component.text("Status: ", NamedTextColor.GRAY)
-                .append(running
-                        ? Component.text("RUNNING", NamedTextColor.GREEN, TextDecoration.BOLD)
-                        : Component.text("STOPPED", NamedTextColor.RED, TextDecoration.BOLD))
-                .append(Component.text("  "))
-                .append(toggle));
-
-        sender.sendMessage(Component.text("Max health: ", NamedTextColor.GRAY)
-                .append(Component.text(
-                        HcgText.formatHearts(decayManager.currentMaxHp()) + " / "
-                                + HcgText.formatHearts(decayManager.maximumHp()) + " hearts",
-                        NamedTextColor.YELLOW))
-                .append(Component.text(" (floor " + HcgText.formatHearts(decayManager.minimumHp()) + ")",
-                        NamedTextColor.DARK_GRAY))
-                .append(Component.text("  "))
-                .append(button("[Restore]", NamedTextColor.AQUA, "/healthdecay set restore",
-                        "Restore everyone's health now")));
-
-        long down = Math.max(INTERVAL_MIN, interval - INTERVAL_STEP);
-        long up = interval + INTERVAL_STEP;
-        sender.sendMessage(Component.text("Interval: ", NamedTextColor.GRAY)
-                .append(Component.text(interval + "s", NamedTextColor.YELLOW)
-                        .hoverEvent(HoverEvent.showText(Component.text("Click to type a custom interval")))
-                        .clickEvent(ClickEvent.suggestCommand("/healthdecay interval ")))
-                .append(Component.text("  "))
-                .append(button("[-" + INTERVAL_STEP + "s]", NamedTextColor.RED,
-                        "/healthdecay set interval " + down, "Set interval to " + down + "s"))
-                .append(Component.text(" "))
-                .append(button("[+" + INTERVAL_STEP + "s]", NamedTextColor.GREEN,
-                        "/healthdecay set interval " + up, "Set interval to " + up + "s")));
-
-        double amountDown = Math.max(AMOUNT_MIN, amount - AMOUNT_STEP);
-        double amountUp = Math.min(AMOUNT_MAX, amount + AMOUNT_STEP);
-        sender.sendMessage(Component.text("Amount: ", NamedTextColor.GRAY)
-                .append(Component.text(fmt(amount) + " heart(s) per tick", NamedTextColor.YELLOW)
-                        .hoverEvent(HoverEvent.showText(Component.text("Click to type a custom amount")))
-                        .clickEvent(ClickEvent.suggestCommand("/healthdecay amount ")))
-                .append(Component.text("  "))
-                .append(button("[-" + fmt(AMOUNT_STEP) + "]", NamedTextColor.RED,
-                        "/healthdecay set amount " + amountDown, "Set amount to " + fmt(amountDown)))
-                .append(Component.text(" "))
-                .append(button("[+" + fmt(AMOUNT_STEP) + "]", NamedTextColor.GREEN,
-                        "/healthdecay set amount " + amountUp, "Set amount to " + fmt(amountUp))));
-
-        sender.sendMessage(Component.text("Click the buttons to change settings.", NamedTextColor.DARK_GRAY)
-                .decorate(TextDecoration.ITALIC));
-    }
-
-    private Component button(String label, NamedTextColor color, String command, String hover) {
-        return Component.text(label, color, TextDecoration.BOLD)
-                .hoverEvent(HoverEvent.showText(Component.text(hover)))
-                .clickEvent(ClickEvent.runCommand(command));
+    private void sendStatus(CommandSender sender) {
+        Messages.send(sender, "healthdecay.status-state",
+                "state", decayManager.isRunning() ? "running" : "stopped");
+        Messages.send(sender, "healthdecay.status-health",
+                "current", HcgText.formatHearts(decayManager.currentMaxHp()),
+                "floor", HcgText.formatHearts(decayManager.minimumHp()));
+        Messages.send(sender, "healthdecay.status-rate",
+                "amount", HcgText.formatHearts(decayManager.decayAmountHp()),
+                "seconds", String.valueOf(plugin.getConfig().getLong("decay.interval-seconds", 60)));
     }
 
     private static String fmt(double value) {

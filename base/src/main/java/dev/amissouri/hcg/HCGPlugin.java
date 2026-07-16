@@ -3,6 +3,7 @@ package dev.amissouri.hcg;
 import java.util.List;
 
 import dev.amissouri.hcg.HelpRegistry.Entry;
+import dev.amissouri.hcg.menu.MenuListener;
 import dev.amissouri.hcg.tweaks.TweaksCommand;
 import dev.amissouri.hcg.tweaks.TweaksGui;
 import dev.amissouri.hcg.tweaks.TweaksGuiListener;
@@ -38,6 +39,7 @@ public final class HCGPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new FreezeListener(freezeManager), this);
         getServer().getPluginManager().registerEvents(new VanishListener(vanishManager), this);
         getServer().getPluginManager().registerEvents(new GodListener(), this);
+        getServer().getPluginManager().registerEvents(new MenuListener(scheduler), this);
         loadedChunks.seed(getLogger());
 
         register("hcg", new HcgCommand());
@@ -99,7 +101,7 @@ public final class HCGPlugin extends JavaPlugin {
                 new Entry("/tweaks", "Open the tweaks menu to turn tweaks on and off."),
                 new Entry("/tweaks list", "List every tweak and its state in chat."),
                 new Entry("/tweaks <tweak> [on|off]", "Check or set one tweak from the console."),
-                new Entry("/veinminer", "Veinminer settings: breaking one ore breaks the vein."),
+                new Entry("/veinminer", "Open the Veinminer chest menu (break one ore, break the vein)."),
                 new Entry("/veinminer mode <shift|enchant|both>",
                         "Sneak to veinmine, need the enchant, or either."),
                 new Entry("/veinminer hunger <on|off>", "Whether the extra blocks cost hunger."),

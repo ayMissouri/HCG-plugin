@@ -1,14 +1,13 @@
 package dev.amissouri.hcg.lavaraise;
 import dev.amissouri.hcg.Messages;
+import dev.amissouri.hcg.menu.Menu;
+import dev.amissouri.hcg.menu.MenuItem;
 
 import java.util.List;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -16,14 +15,13 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 
-/**
- * /volcano setcenter, marks the block you're looking at as the crater.
- * /volcano erupt [seconds].
- */
 public final class VolcanoCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS =
             List.of("setcenter", "erupt", "stop", "schedule", "duration", "radius", "shake", "status");
+
+    private static final int DAY_TICKS = 24000;
+    private static final int TIME_STEP = 1000;
 
     private final VolcanoManager manager;
 
@@ -34,11 +32,11 @@ public final class VolcanoCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
-            showMenu(sender);
+            openOrStatus(sender);
             return true;
         }
         switch (args[0].toLowerCase()) {
-            case "menu" -> showMenu(sender);
+            case "menu" -> openOrStatus(sender);
             case "setcenter" -> {
                 if (!(sender instanceof Player player)) {
                     Messages.send(sender, "general.only-players");
@@ -48,12 +46,7 @@ public final class VolcanoCommand implements CommandExecutor, TabCompleter {
                 Location center = target != null
                         ? target.getLocation().add(0, 1, 0)
                         : player.getLocation();
-                manager.setCenter(center);
-                Messages.send(sender, "volcano.center-set",
-                        "x", String.valueOf(center.getBlockX()),
-                        "y", String.valueOf(center.getBlockY()),
-                        "z", String.valueOf(center.getBlockZ()),
-                        "world", center.getWorld().getName());
+                setCenter(sender, center);
             }
             case "erupt" -> {
                 int seconds = manager.durationSeconds();
@@ -130,28 +123,7 @@ public final class VolcanoCommand implements CommandExecutor, TabCompleter {
                 manager.setShakeEnabled(on);
                 Messages.send(sender, "volcano.shake-set", "state", on ? "on" : "off");
             }
-            case "status" -> {
-                Location center = manager.center();
-                String where = center == null ? "not set"
-                        : center.getBlockX() + ", " + center.getBlockY() + ", " + center.getBlockZ()
-                                + " (" + center.getWorld().getName() + ")";
-                Messages.send(sender, "volcano.status",
-                        "state", manager.isErupting() ? "ERUPTING" : "quiet",
-                        "center", where,
-                        "seconds", String.valueOf(manager.durationSeconds()));
-                Messages.send(sender, manager.isScheduled()
-                                ? "volcano.status-schedule-on" : "volcano.status-schedule-off",
-                        "time", LavaRaiseManager.formatTime(manager.eruptTime()));
-            }
-            // Hidden: menu buttons apply and redraw.
-            case "ui" -> {
-                if (args.length >= 2) {
-                    String[] rest = new String[args.length - 1];
-                    System.arraycopy(args, 1, rest, 0, rest.length);
-                    onCommand(sender, command, label, rest);
-                }
-                showMenu(sender);
-            }
+            case "status" -> sendStatus(sender);
             default -> {
                 return false;
             }
@@ -159,98 +131,111 @@ public final class VolcanoCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    private void showMenu(CommandSender sender) {
-        sender.sendMessage(Component.text("--- ", NamedTextColor.DARK_GRAY)
-                .append(Component.text("Volcano", NamedTextColor.GOLD, TextDecoration.BOLD))
-                .append(Component.text(" ---", NamedTextColor.DARK_GRAY)));
-
-        Location center = manager.center();
-        Component centerLine = Component.text("Center: ", NamedTextColor.GRAY)
-                .append(center == null
-                        ? Component.text("not set", NamedTextColor.RED)
-                        : Component.text(center.getBlockX() + ", " + center.getBlockY() + ", "
-                                + center.getBlockZ(), NamedTextColor.YELLOW))
-                .append(Component.text("  "))
-                .append(button("[Set to Crosshair]", NamedTextColor.AQUA, "/volcano ui setcenter",
-                        "Set the center to the block you're looking at"));
-        sender.sendMessage(centerLine);
-
-        Component action = manager.isErupting()
-                ? button("[Stop]", NamedTextColor.RED, "/volcano ui stop", "Calm the volcano")
-                : button("[Erupt!]", NamedTextColor.GOLD, "/volcano ui erupt", "Trigger an eruption now");
-        sender.sendMessage(Component.text("Status: ", NamedTextColor.GRAY)
-                .append(manager.isErupting()
-                        ? Component.text("ERUPTING", NamedTextColor.DARK_RED, TextDecoration.BOLD)
-                        : Component.text("QUIET", NamedTextColor.GREEN, TextDecoration.BOLD))
-                .append(Component.text("  "))
-                .append(action));
-
-        Component scheduleLine = Component.text("Schedule: ", NamedTextColor.GRAY);
-        if (manager.isScheduled()) {
-            scheduleLine = scheduleLine
-                    .append(Component.text("daily at " + LavaRaiseManager.formatTime(manager.eruptTime()),
-                            NamedTextColor.YELLOW)
-                            .hoverEvent(HoverEvent.showText(Component.text("Click to type a new time")))
-                            .clickEvent(ClickEvent.suggestCommand("/volcano schedule ")))
-                    .append(Component.text("  "))
-                    .append(button("[Disable]", NamedTextColor.RED, "/volcano ui schedule off",
-                            "Back to manual eruptions only"));
+    private void openOrStatus(CommandSender sender) {
+        if (sender instanceof Player player) {
+            openMenu(player);
         } else {
-            scheduleLine = scheduleLine
-                    .append(Component.text("manual only", NamedTextColor.YELLOW))
-                    .append(Component.text("  "))
-                    .append(Component.text("[Set Time]", NamedTextColor.GREEN, TextDecoration.BOLD)
-                            .hoverEvent(HoverEvent.showText(Component.text(
-                                    "Erupt daily at a world-clock time (ticks, HH:MM, or noon/midnight/...)")))
-                            .clickEvent(ClickEvent.suggestCommand("/volcano schedule ")));
+            sendStatus(sender);
         }
-        sender.sendMessage(scheduleLine);
-
-        int duration = manager.durationSeconds();
-        sender.sendMessage(Component.text("Duration: ", NamedTextColor.GRAY)
-                .append(Component.text(duration + "s", NamedTextColor.YELLOW)
-                        .hoverEvent(HoverEvent.showText(Component.text("Click to type a duration")))
-                        .clickEvent(ClickEvent.suggestCommand("/volcano duration ")))
-                .append(Component.text("  "))
-                .append(button("[-5s]", NamedTextColor.RED,
-                        "/volcano ui duration " + Math.max(3, duration - 5),
-                        "Set duration to " + Math.max(3, duration - 5) + "s"))
-                .append(Component.text(" "))
-                .append(button("[+5s]", NamedTextColor.GREEN,
-                        "/volcano ui duration " + Math.min(600, duration + 5),
-                        "Set duration to " + Math.min(600, duration + 5) + "s")));
-
-        boolean shake = manager.isShakeEnabled();
-        sender.sendMessage(Component.text("Screen shake: ", NamedTextColor.GRAY)
-                .append(shake
-                        ? Component.text("ON", NamedTextColor.GREEN, TextDecoration.BOLD)
-                        : Component.text("OFF", NamedTextColor.RED, TextDecoration.BOLD))
-                .append(Component.text("  "))
-                .append(shake
-                        ? button("[Disable]", NamedTextColor.RED, "/volcano ui shake off",
-                                "Eruptions no longer shake screens")
-                        : button("[Enable]", NamedTextColor.GREEN, "/volcano ui shake on",
-                                "Eruptions shake nearby players' screens")));
-
-        int radius = manager.shakeRadius();
-        sender.sendMessage(Component.text("Shake radius: ", NamedTextColor.GRAY)
-                .append(Component.text(radius + " blocks", NamedTextColor.YELLOW)
-                        .hoverEvent(HoverEvent.showText(Component.text("Click to type a radius")))
-                        .clickEvent(ClickEvent.suggestCommand("/volcano radius ")))
-                .append(Component.text("  "))
-                .append(button("[-25]", NamedTextColor.RED,
-                        "/volcano ui radius " + Math.max(10, radius - 25),
-                        "Set shake radius to " + Math.max(10, radius - 25) + " blocks"))
-                .append(Component.text(" "))
-                .append(button("[+25]", NamedTextColor.GREEN,
-                        "/volcano ui radius " + Math.min(1000, radius + 25),
-                        "Set shake radius to " + Math.min(1000, radius + 25) + " blocks")));
     }
 
-    private Component button(String text, NamedTextColor color, String command, String hover) {
-        return Component.text(text, color, TextDecoration.BOLD)
-                .hoverEvent(HoverEvent.showText(Component.text(hover)))
-                .clickEvent(ClickEvent.runCommand(command));
+    private void openMenu(Player player) {
+        Menu.open(player, "Volcano", menu -> {
+            boolean erupting = manager.isErupting();
+            Location center = manager.center();
+            String where = center == null ? "not set"
+                    : center.getBlockX() + ", " + center.getBlockY() + ", " + center.getBlockZ();
+            menu.header(MenuItem.display("Volcano", erupting ? NamedTextColor.DARK_RED : NamedTextColor.GREEN,
+                    Material.MAGMA_BLOCK,
+                    List.of("Status: " + (erupting ? "ERUPTING" : "quiet"), "Center: " + where)));
+
+            if (erupting) {
+                menu.add(MenuItem.button("Stop eruption", NamedTextColor.RED, Material.BARRIER,
+                        List.of("Calm the volcano immediately."),
+                        clicker -> manager.stop()));
+            } else {
+                menu.add(MenuItem.button("Erupt now", NamedTextColor.GOLD, Material.FIRE_CHARGE,
+                        List.of("Trigger an eruption at the crater."),
+                        clicker -> {
+                            if (manager.center() == null) {
+                                Messages.send(clicker, "volcano.no-center");
+                            } else {
+                                manager.erupt(manager.durationSeconds());
+                            }
+                        }));
+            }
+
+            menu.add(MenuItem.button("Set center here", NamedTextColor.AQUA, Material.COMPASS,
+                    List.of("Mark the crater at your position."),
+                    clicker -> setCenter(clicker, clicker.getLocation())));
+
+            menu.add(MenuItem.stepper("Duration", Material.CLOCK,
+                    List.of("How long an eruption lasts."),
+                    () -> manager.durationSeconds() + "s",
+                    forward -> {
+                        int seconds = manager.durationSeconds();
+                        manager.setDurationSeconds(
+                                forward ? Math.min(600, seconds + 5) : Math.max(3, seconds - 5));
+                    }));
+
+            menu.add(MenuItem.toggle("Daily schedule", Material.RECOVERY_COMPASS,
+                    List.of("Erupt automatically at a set world time."),
+                    manager::isScheduled,
+                    on -> {
+                        if (on) {
+                            manager.setSchedule(manager.eruptTime());
+                        } else {
+                            manager.disableSchedule();
+                        }
+                    }));
+
+            if (manager.isScheduled()) {
+                menu.add(MenuItem.stepper("Schedule time", Material.CLOCK,
+                        List.of("World time of the daily eruption."),
+                        () -> LavaRaiseManager.formatTime(manager.eruptTime()),
+                        forward -> manager.setSchedule(stepTime(manager.eruptTime(), forward))));
+            }
+
+            menu.add(MenuItem.toggle("Screen shake", Material.BELL,
+                    List.of("Eruptions shake nearby players' screens."),
+                    manager::isShakeEnabled, manager::setShakeEnabled));
+
+            menu.add(MenuItem.stepper("Shake radius", Material.REDSTONE,
+                    List.of("How far the screen shake reaches."),
+                    () -> manager.shakeRadius() + " blocks",
+                    forward -> {
+                        int blocks = manager.shakeRadius();
+                        manager.setShakeRadius(
+                                forward ? Math.min(1000, blocks + 25) : Math.max(10, blocks - 25));
+                    }));
+        });
+    }
+
+    private void setCenter(CommandSender sender, Location center) {
+        manager.setCenter(center);
+        Messages.send(sender, "volcano.center-set",
+                "x", String.valueOf(center.getBlockX()),
+                "y", String.valueOf(center.getBlockY()),
+                "z", String.valueOf(center.getBlockZ()),
+                "world", center.getWorld().getName());
+    }
+
+    private static int stepTime(int ticks, boolean forward) {
+        return Math.floorMod(ticks + (forward ? TIME_STEP : -TIME_STEP), DAY_TICKS);
+    }
+
+    private void sendStatus(CommandSender sender) {
+        Location center = manager.center();
+        String where = center == null ? "not set"
+                : center.getBlockX() + ", " + center.getBlockY() + ", " + center.getBlockZ()
+                        + " (" + center.getWorld().getName() + ")";
+        Messages.send(sender, "volcano.status",
+                "state", manager.isErupting() ? "ERUPTING" : "quiet",
+                "center", where,
+                "seconds", String.valueOf(manager.durationSeconds()));
+        Messages.send(sender, manager.isScheduled()
+                        ? "volcano.status-schedule-on" : "volcano.status-schedule-off",
+                "time", LavaRaiseManager.formatTime(manager.eruptTime()));
     }
 
     @Override

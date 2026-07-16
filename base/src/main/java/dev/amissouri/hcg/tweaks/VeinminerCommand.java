@@ -8,8 +8,6 @@ import dev.amissouri.hcg.Messages;
 import dev.amissouri.hcg.tweaks.VeinminerTweak.Durability;
 import dev.amissouri.hcg.tweaks.VeinminerTweak.Mode;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
@@ -43,14 +41,13 @@ public final class VeinminerCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
-            showMenu(sender);
+            openOrStatus(sender);
             return true;
         }
         switch (args[0].toLowerCase(Locale.ROOT)) {
-            case "menu" -> showMenu(sender);
+            case "menu", "gui" -> openOrStatus(sender);
             case "on" -> setEnabled(sender, true);
             case "off" -> setEnabled(sender, false);
-            case "gui" -> openGui(sender);
             case "reload" -> {
                 tweak.reload();
                 Messages.send(sender, "tweaks.veinminer.reloaded");
@@ -120,6 +117,22 @@ public final class VeinminerCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private void openOrStatus(CommandSender sender) {
+        if (sender instanceof Player player) {
+            openGui(player);
+        } else {
+            sendStatus(sender);
+        }
+    }
+
+    private void openGui(Player player) {
+        if (!player.hasPermission("hcg.tweaks")) {
+            Messages.send(player, "general.no-permission");
+            return;
+        }
+        gui.openTweak(player, tweak);
+    }
+
     private void setEnabled(CommandSender sender, boolean on) {
         if (tweak.isEnabled() == on) {
             Messages.send(sender, "tweaks.already",
@@ -129,18 +142,6 @@ public final class VeinminerCommand implements CommandExecutor, TabCompleter {
         tweak.setEnabled(on);
         Messages.broadcastOps("tweaks.set",
                 "tweak", tweak.displayName(), "state", on ? "enabled" : "disabled");
-    }
-
-    private void openGui(CommandSender sender) {
-        if (!(sender instanceof Player player)) {
-            Messages.send(sender, "general.only-players");
-            return;
-        }
-        if (!player.hasPermission("hcg.tweaks")) {
-            Messages.send(sender, "general.no-permission");
-            return;
-        }
-        gui.openTweak(player, tweak);
     }
 
     private void applyEnchant(CommandSender sender, String[] args, boolean grant) {
@@ -178,52 +179,30 @@ public final class VeinminerCommand implements CommandExecutor, TabCompleter {
         });
     }
 
-    private void showMenu(CommandSender sender) {
-        boolean on = tweak.isEnabled();
+    private void sendStatus(CommandSender sender) {
         sender.sendMessage(Component.text("--- ", NamedTextColor.DARK_GRAY)
                 .append(Component.text(tweak.displayName(), NamedTextColor.GOLD, TextDecoration.BOLD))
                 .append(Component.text(" ---", NamedTextColor.DARK_GRAY)));
-
         sender.sendMessage(Component.text("Status: ", NamedTextColor.GRAY)
-                .append(on
+                .append(tweak.isEnabled()
                         ? Component.text("ENABLED", NamedTextColor.GREEN, TextDecoration.BOLD)
-                        : Component.text("DISABLED", NamedTextColor.RED, TextDecoration.BOLD))
-                .append(Component.text("  "))
-                .append(on
-                        ? button("[Disable]", NamedTextColor.RED, "/veinminer off",
-                                "Ores break one at a time again")
-                        : button("[Enable]", NamedTextColor.GREEN, "/veinminer on",
-                                "Breaking one ore breaks the whole vein")));
-
-        line(sender, "Mode", tweak.mode().name(), "/veinminer mode ");
-        line(sender, "Hunger cost", onOff(tweak.hungerEnabled()), "/veinminer hunger ");
-        line(sender, "Durability cost", tweak.durability().name().replace('_', ' '),
-                "/veinminer durability ");
-        line(sender, "Max vein size", String.valueOf(tweak.maxVeinSize()), "/veinminer size ");
-        line(sender, "Require correct tool", onOff(tweak.requireCorrectTool()), "/veinminer tool ");
-        line(sender, "Sneak with enchant", onOff(tweak.requireSneak()), "/veinminer sneak ");
-        line(sender, "Enchant chance", tweak.enchantChance() + "%", "/veinminer chance ");
-        line(sender, "Enchant min level", String.valueOf(tweak.enchantMinLevel()),
-                "/veinminer minlevel ");
-
-        sender.sendMessage(Component.text("  ")
-                .append(button("[Open GUI]", NamedTextColor.AQUA, "/veinminer gui",
-                        "Manage every setting from a chest menu")));
+                        : Component.text("DISABLED", NamedTextColor.RED, TextDecoration.BOLD)));
+        line(sender, "Mode", tweak.mode().name());
+        line(sender, "Hunger cost", onOff(tweak.hungerEnabled()));
+        line(sender, "Durability cost", tweak.durability().name().replace('_', ' '));
+        line(sender, "Max vein size", String.valueOf(tweak.maxVeinSize()));
+        line(sender, "Require correct tool", onOff(tweak.requireCorrectTool()));
+        line(sender, "Sneak with enchant", onOff(tweak.requireSneak()));
+        line(sender, "Enchant chance", tweak.enchantChance() + "%");
+        line(sender, "Enchant min level", String.valueOf(tweak.enchantMinLevel()));
+        sender.sendMessage(Component.text("Change with /veinminer <setting> <value>, "
+                + "or open the chest menu in-game with /veinminer.", NamedTextColor.DARK_GRAY)
+                .decorate(TextDecoration.ITALIC));
     }
 
-    private void line(CommandSender sender, String name, String value, String fill) {
+    private void line(CommandSender sender, String name, String value) {
         sender.sendMessage(Component.text(name + ": ", NamedTextColor.GRAY)
-                .append(Component.text(value, NamedTextColor.YELLOW))
-                .append(Component.text("  "))
-                .append(Component.text("[Change]", NamedTextColor.LIGHT_PURPLE)
-                        .hoverEvent(HoverEvent.showText(Component.text("Fills in " + fill.trim())))
-                        .clickEvent(ClickEvent.suggestCommand(fill))));
-    }
-
-    private Component button(String label, NamedTextColor color, String command, String hover) {
-        return Component.text(label, color, TextDecoration.BOLD)
-                .hoverEvent(HoverEvent.showText(Component.text(hover)))
-                .clickEvent(ClickEvent.runCommand(command));
+                .append(Component.text(value, NamedTextColor.YELLOW)));
     }
 
     private void report(CommandSender sender, String name, String value) {

@@ -1,19 +1,19 @@
 package dev.amissouri.hcg.lavaraise;
 import dev.amissouri.hcg.Messages;
+import dev.amissouri.hcg.menu.Menu;
+import dev.amissouri.hcg.menu.MenuItem;
 
 import java.util.List;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
 
-/** /lavaraise, clickable settings menu plus typed subcommands. */
+/** /lavaraise, a chest settings menu for players plus typed subcommands. */
 public final class LavaRaiseCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS = List.of(
@@ -21,6 +21,9 @@ public final class LavaRaiseCommand implements CommandExecutor, TabCompleter {
             "blocks", "mobs", "cancel", "purge");
     private static final List<String> TIME_SUGGESTIONS =
             List.of("day", "noon", "sunset", "night", "midnight", "sunrise", "0", "6000", "12000", "18000");
+
+    private static final int DAY_TICKS = 24000;
+    private static final int TIME_STEP = 1000;
 
     private final LavaRaiseManager manager;
 
@@ -31,11 +34,11 @@ public final class LavaRaiseCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
-            showMenu(sender);
+            openOrStatus(sender);
             return true;
         }
         switch (args[0].toLowerCase()) {
-            case "menu" -> showMenu(sender);
+            case "menu" -> openOrStatus(sender);
             case "on" -> {
                 if (manager.isEnabled()) {
                     Messages.send(sender, "lavaraise.already-enabled");
@@ -123,19 +126,94 @@ public final class LavaRaiseCommand implements CommandExecutor, TabCompleter {
                     }
                 }
             }
-            case "set" -> {
-                if (args.length >= 2) {
-                    String[] rest = new String[args.length - 1];
-                    System.arraycopy(args, 1, rest, 0, rest.length);
-                    onCommand(sender, command, label, rest);
-                }
-                showMenu(sender);
-            }
             default -> {
                 return false;
             }
         }
         return true;
+    }
+
+    private void openOrStatus(CommandSender sender) {
+        if (sender instanceof Player player) {
+            openMenu(player);
+        } else {
+            sendStatus(sender);
+        }
+    }
+
+    private void openMenu(Player player) {
+        Menu.open(player, "Lava Raise", menu -> {
+            menu.header(MenuItem.toggle("Lava Raise", Material.LAVA_BUCKET,
+                    List.of("A client-side lava tide rises daily,",
+                            "then drains. Phase: " + phaseLabel()),
+                    manager::isEnabled,
+                    on -> {
+                        if (on) {
+                            manager.enable();
+                        } else {
+                            manager.disable();
+                        }
+                    }));
+
+            if (manager.isActive()) {
+                menu.add(MenuItem.button("Drain now", NamedTextColor.GOLD, Material.BUCKET,
+                        List.of("Drain the lava immediately."),
+                        clicker -> manager.cancelEvent()));
+            }
+
+            menu.add(MenuItem.stepper("Rises at", Material.CLOCK,
+                    List.of("World time the lava starts rising."),
+                    () -> LavaRaiseManager.formatTime(manager.startTime()),
+                    forward -> manager.set("start-time", stepTime(manager.startTime(), forward))));
+
+            menu.add(MenuItem.stepper("Drains at", Material.CLOCK,
+                    List.of("World time the lava drains away."),
+                    () -> LavaRaiseManager.formatTime(manager.endTime()),
+                    forward -> manager.set("end-time", stepTime(manager.endTime(), forward))));
+
+            menu.add(MenuItem.stepper("Travel time", Material.MINECART,
+                    List.of("Seconds to climb from floor to max."),
+                    () -> manager.riseDurationSeconds() + "s",
+                    forward -> {
+                        int seconds = manager.riseDurationSeconds();
+                        manager.set("rise-duration-seconds",
+                                forward ? Math.min(7200, seconds + 60) : Math.max(10, seconds - 60));
+                    }));
+
+            menu.add(MenuItem.stepper("Max level", Material.LADDER,
+                    List.of("Highest Y the lava reaches."),
+                    () -> "Y=" + manager.maxY(),
+                    forward -> {
+                        int y = manager.maxY();
+                        manager.set("max-y", forward ? Math.min(319, y + 8) : Math.max(-63, y - 8));
+                    }));
+
+            menu.add(MenuItem.toggle("Replace water", Material.WATER_BUCKET,
+                    List.of("Oceans fill with lava; water stops protecting."),
+                    manager::replaceWater, on -> manager.set("replace-water", on)));
+
+            menu.add(MenuItem.toggle("Burn builds", Material.FLINT_AND_STEEL,
+                    List.of("Player-placed burnable blocks burn away."),
+                    manager::burnPlacedBlocks, on -> manager.set("burn-placed-blocks", on)));
+
+            menu.add(MenuItem.toggle("Damage mobs", Material.ROTTEN_FLESH,
+                    List.of("Mobs in the lava burn and take damage."),
+                    manager::damageMobs, on -> manager.set("damage-mobs", on)));
+        });
+    }
+
+    private String phaseLabel() {
+        return switch (manager.phase()) {
+            case IDLE -> "idle";
+            case ARMED -> "armed";
+            case RISING -> "rising (Y=" + manager.currentLavaY() + ")";
+            case HOLDING -> "holding (Y=" + manager.currentLavaY() + ")";
+            case DRAINING -> "draining (Y=" + manager.currentLavaY() + ")";
+        };
+    }
+
+    private static int stepTime(int ticks, boolean forward) {
+        return Math.floorMod(ticks + (forward ? TIME_STEP : -TIME_STEP), DAY_TICKS);
     }
 
     private Integer parseInt(CommandSender sender, String[] args, int min, int max) {
@@ -172,106 +250,6 @@ public final class LavaRaiseCommand implements CommandExecutor, TabCompleter {
                 "seconds", String.valueOf(manager.riseDurationSeconds()),
                 "y", String.valueOf(manager.maxY()),
                 "water", manager.replaceWater() ? "replaced" : "kept");
-    }
-
-    private void showMenu(CommandSender sender) {
-        boolean enabled = manager.isEnabled();
-
-        sender.sendMessage(Component.text("--- ", NamedTextColor.DARK_GRAY)
-                .append(Component.text("Lava Raise", NamedTextColor.GOLD, TextDecoration.BOLD))
-                .append(Component.text(" ---", NamedTextColor.DARK_GRAY)));
-
-        String phaseLabel = switch (manager.phase()) {
-            case IDLE -> "DISABLED";
-            case ARMED -> "ARMED";
-            case RISING -> "RISING (Y=" + manager.currentLavaY() + ")";
-            case HOLDING -> "HOLDING (Y=" + manager.currentLavaY() + ")";
-            case DRAINING -> "DRAINING (Y=" + manager.currentLavaY() + ")";
-        };
-        Component toggle = enabled
-                ? button("[Disable]", NamedTextColor.RED, "/lavaraise set off",
-                        "Disable the mode (drains any lava)")
-                : button("[Enable]", NamedTextColor.GREEN, "/lavaraise set on",
-                        "Arm the daily lava raise");
-        Component statusLine = Component.text("Status: ", NamedTextColor.GRAY)
-                .append(Component.text(phaseLabel,
-                        enabled ? NamedTextColor.GREEN : NamedTextColor.RED, TextDecoration.BOLD))
-                .append(Component.text("  "))
-                .append(toggle);
-        if (manager.isActive()) {
-            statusLine = statusLine.append(Component.text(" "))
-                    .append(button("[Drain Now]", NamedTextColor.GOLD, "/lavaraise set cancel",
-                            "Drain the lava immediately"));
-        }
-        sender.sendMessage(statusLine);
-
-        sender.sendMessage(Component.text("Rises at: ", NamedTextColor.GRAY)
-                .append(clickValue(LavaRaiseManager.formatTime(manager.startTime()),
-                        "/lavaraise start ", "Click to type a start time")));
-        sender.sendMessage(Component.text("Drains at: ", NamedTextColor.GRAY)
-                .append(clickValue(LavaRaiseManager.formatTime(manager.endTime()),
-                        "/lavaraise end ", "Click to type an end time")));
-
-        int duration = manager.riseDurationSeconds();
-        sender.sendMessage(Component.text("Travel time: ", NamedTextColor.GRAY)
-                .append(clickValue(duration + "s", "/lavaraise duration ", "Click to type a duration"))
-                .append(Component.text("  "))
-                .append(button("[-60s]", NamedTextColor.RED, "/lavaraise set duration " + Math.max(10, duration - 60),
-                        "Set travel time to " + Math.max(10, duration - 60) + "s"))
-                .append(Component.text(" "))
-                .append(button("[+60s]", NamedTextColor.GREEN, "/lavaraise set duration " + Math.min(7200, duration + 60),
-                        "Set travel time to " + Math.min(7200, duration + 60) + "s")));
-
-        int maxY = manager.maxY();
-        sender.sendMessage(Component.text("Max level: ", NamedTextColor.GRAY)
-                .append(clickValue("Y=" + maxY, "/lavaraise maxy ", "Click to type a Y level"))
-                .append(Component.text("  "))
-                .append(button("[-8]", NamedTextColor.RED, "/lavaraise set maxy " + Math.max(-63, maxY - 8),
-                        "Set max level to Y=" + Math.max(-63, maxY - 8)))
-                .append(Component.text(" "))
-                .append(button("[+8]", NamedTextColor.GREEN, "/lavaraise set maxy " + Math.min(319, maxY + 8),
-                        "Set max level to Y=" + Math.min(319, maxY + 8))));
-
-        sender.sendMessage(toggleLine("Replace water", manager.replaceWater(), "water",
-                "Oceans fill with lava too; water no longer protects",
-                "Lava sits on top of oceans; water is safe"));
-        sender.sendMessage(toggleLine("Burn builds", manager.burnPlacedBlocks(), "blocks",
-                "Player-placed burnable blocks burn away as the lava passes",
-                "Player builds survive the lava"));
-        sender.sendMessage(toggleLine("Damage mobs", manager.damageMobs(), "mobs",
-                "Mobs in the lava burn and take damage",
-                "Mobs ignore the lava"));
-
-        sender.sendMessage(Component.text(
-                "The lava is a client-side illusion, no blocks are ever changed. "
-                        + "Players at or below the level burn like in real lava.",
-                NamedTextColor.DARK_GRAY).decorate(TextDecoration.ITALIC));
-    }
-
-    private Component toggleLine(String label, boolean on, String subcommand,
-                                 String enableHover, String disableHover) {
-        return Component.text(label + ": ", NamedTextColor.GRAY)
-                .append(on
-                        ? Component.text("ON", NamedTextColor.GREEN, TextDecoration.BOLD)
-                        : Component.text("OFF", NamedTextColor.RED, TextDecoration.BOLD))
-                .append(Component.text("  "))
-                .append(on
-                        ? button("[Disable]", NamedTextColor.RED, "/lavaraise set " + subcommand + " off",
-                                disableHover)
-                        : button("[Enable]", NamedTextColor.GREEN, "/lavaraise set " + subcommand + " on",
-                                enableHover));
-    }
-
-    private Component button(String text, NamedTextColor color, String command, String hover) {
-        return Component.text(text, color, TextDecoration.BOLD)
-                .hoverEvent(HoverEvent.showText(Component.text(hover)))
-                .clickEvent(ClickEvent.runCommand(command));
-    }
-
-    private Component clickValue(String value, String suggest, String hover) {
-        return Component.text(value, NamedTextColor.YELLOW)
-                .hoverEvent(HoverEvent.showText(Component.text(hover)))
-                .clickEvent(ClickEvent.suggestCommand(suggest));
     }
 
     @Override

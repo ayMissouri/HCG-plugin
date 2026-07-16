@@ -1,13 +1,12 @@
 package dev.amissouri.hcg.graves;
 import dev.amissouri.hcg.Messages;
+import dev.amissouri.hcg.menu.Menu;
+import dev.amissouri.hcg.menu.MenuItem;
 
 import java.util.List;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -29,32 +28,47 @@ public final class GravesCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
-            showMenu(sender);
+            openOrStatus(sender);
             return true;
         }
         switch (args[0].toLowerCase()) {
-            case "menu" -> showMenu(sender);
+            case "menu" -> openOrStatus(sender);
             case "on" -> turnOn(sender);
             case "off" -> turnOff(sender);
-            case "status" -> Messages.send(sender, "graves.status",
-                    "state", manager.isEnabled() ? "enabled" : "disabled",
-                    "count", String.valueOf(manager.count()));
+            case "status" -> sendStatus(sender);
             case "remove" -> removeTarget(sender);
-            case "set" -> {
-                if (args.length >= 2) {
-                    switch (args[1].toLowerCase()) {
-                        case "on" -> turnOn(sender);
-                        case "off" -> turnOff(sender);
-                        default -> { }
-                    }
-                }
-                showMenu(sender);
-            }
             default -> {
                 return false;
             }
         }
         return true;
+    }
+
+    private void openOrStatus(CommandSender sender) {
+        if (sender instanceof Player player) {
+            openMenu(player);
+        } else {
+            sendStatus(sender);
+        }
+    }
+
+    private void openMenu(Player player) {
+        Menu.open(player, "Graves", menu -> {
+            menu.header(MenuItem.toggle("Graves", Material.PLAYER_HEAD,
+                    List.of("On death a head stores the victim's",
+                            "items and full XP; only the owner collects it."),
+                    manager::isEnabled,
+                    on -> {
+                        manager.setEnabled(on);
+                        Messages.broadcastOps(on
+                                ? "graves.enabled-broadcast" : "graves.disabled-broadcast");
+                    }));
+
+            menu.add(MenuItem.display("Graves placed", NamedTextColor.YELLOW, Material.CHEST,
+                    List.of(manager.count() + " in the world.",
+                            "Use /graves remove while looking",
+                            "at one to force it open.")));
+        });
     }
 
     private void turnOn(CommandSender sender) {
@@ -90,41 +104,10 @@ public final class GravesCommand implements CommandExecutor, TabCompleter {
         Messages.send(sender, "graves.removed", "owner", grave.ownerName());
     }
 
-    private void showMenu(CommandSender sender) {
-        boolean enabled = manager.isEnabled();
-
-        sender.sendMessage(Component.text("--- ", NamedTextColor.DARK_GRAY)
-                .append(Component.text("Graves", NamedTextColor.GOLD, TextDecoration.BOLD))
-                .append(Component.text(" ---", NamedTextColor.DARK_GRAY)));
-
-        Component toggle = enabled
-                ? button("[Disable]", NamedTextColor.RED, "/graves set off",
-                        "Deaths drop items and XP normally again")
-                : button("[Enable]", NamedTextColor.GREEN, "/graves set on",
-                        "Deaths store items and XP in a grave");
-        sender.sendMessage(Component.text("Status: ", NamedTextColor.GRAY)
-                .append(enabled
-                        ? Component.text("ENABLED", NamedTextColor.GREEN, TextDecoration.BOLD)
-                        : Component.text("DISABLED", NamedTextColor.RED, TextDecoration.BOLD))
-                .append(Component.text("  "))
-                .append(toggle));
-
-        sender.sendMessage(Component.text("Graves: ", NamedTextColor.GRAY)
-                .append(Component.text(manager.count() + " placed", NamedTextColor.YELLOW))
-                .append(Component.text("  "))
-                .append(button("[Remove target]", NamedTextColor.LIGHT_PURPLE, "/graves remove",
-                        "Force remove the grave you're looking at, its contents drop on the floor")));
-
-        sender.sendMessage(Component.text(
-                "On death a player head stores the victim's items and full XP. "
-                        + "Only the owner can collect it (right-click or break it).",
-                NamedTextColor.GRAY));
-    }
-
-    private Component button(String label, NamedTextColor color, String command, String hover) {
-        return Component.text(label, color, TextDecoration.BOLD)
-                .hoverEvent(HoverEvent.showText(Component.text(hover)))
-                .clickEvent(ClickEvent.runCommand(command));
+    private void sendStatus(CommandSender sender) {
+        Messages.send(sender, "graves.status",
+                "state", manager.isEnabled() ? "enabled" : "disabled",
+                "count", String.valueOf(manager.count()));
     }
 
     @Override

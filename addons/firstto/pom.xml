@@ -7,12 +7,12 @@
     <parent>
         <groupId>dev.amissouri</groupId>
         <artifactId>hcg-parent</artifactId>
-        <version>4.4.0</version>
+        <version>4.5.2</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
     <artifactId>hcg-firstto</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
     <packaging>jar</packaging>
     <name>HCGplugin-FirstTo</name>
 

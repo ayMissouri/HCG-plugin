@@ -1,19 +1,19 @@
 package dev.amissouri.hcg.firstto;
 import dev.amissouri.hcg.Messages;
+import dev.amissouri.hcg.menu.Menu;
+import dev.amissouri.hcg.menu.MenuItem;
 
 import java.util.List;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
 
-/** /firstto craft|obtain|stop|status, plus nether|end|tpspawn toggles, item race with a slot-machine roll. */
+/** /firstto, a chest menu for players plus craft|obtain|stop|status and nether|end|tpspawn toggles. */
 public final class FirstToCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS =
@@ -29,11 +29,11 @@ public final class FirstToCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
-            showMenu(sender);
+            openOrStatus(sender);
             return true;
         }
         switch (args[0].toLowerCase()) {
-            case "menu" -> showMenu(sender);
+            case "menu" -> openOrStatus(sender);
             case "craft" -> startRound(sender, FirstToManager.Mode.CRAFT);
             case "obtain", "get" -> startRound(sender, FirstToManager.Mode.OBTAIN);
             case "stop" -> stop(sender);
@@ -44,12 +44,6 @@ public final class FirstToCommand implements CommandExecutor, TabCompleter {
                 }
                 return toggle(sender, args[0].toLowerCase(), args[1].toLowerCase());
             }
-            case "set" -> {
-                if (args.length >= 3 && TOGGLES.contains(args[1].toLowerCase())) {
-                    toggle(sender, args[1].toLowerCase(), args[2].toLowerCase());
-                }
-                showMenu(sender);
-            }
             default -> {
                 return false;
             }
@@ -57,8 +51,62 @@ public final class FirstToCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    private void startRound(CommandSender sender, FirstToManager.Mode mode) {
+    private void openOrStatus(CommandSender sender) {
+        if (sender instanceof Player player) {
+            openMenu(player);
+        } else {
+            showStatus(sender);
+        }
+    }
+
+    private void openMenu(Player player) {
+        Menu.open(player, "First To", menu -> {
+            menu.header(MenuItem.display("First To",
+                    manager.isRunning() || manager.isRolling() ? NamedTextColor.GREEN : NamedTextColor.GRAY,
+                    Material.TARGET,
+                    List.of("Race to be first to craft or obtain",
+                            "a randomly rolled item.", roundLine())));
+
+            if (manager.isRunning()) {
+                menu.add(MenuItem.button("Stop round", NamedTextColor.RED, Material.BARRIER,
+                        List.of("Cancel the current round."),
+                        clicker -> stop(clicker)));
+            } else if (!manager.isRolling()) {
+                menu.add(MenuItem.button("Craft round", NamedTextColor.GREEN, Material.CRAFTING_TABLE,
+                        List.of("Roll a craftable item; first to", "craft it wins."),
+                        clicker -> startRound(clicker, FirstToManager.Mode.CRAFT)));
+                menu.add(MenuItem.button("Obtain round", NamedTextColor.AQUA, Material.CHEST,
+                        List.of("Roll any survival item; first to", "get one wins."),
+                        clicker -> startRound(clicker, FirstToManager.Mode.OBTAIN)));
+            }
+
+            menu.add(MenuItem.toggle("Nether items", Material.NETHERRACK,
+                    List.of("Allow nether-only items as targets."),
+                    manager::includeNether, manager::setIncludeNether));
+
+            menu.add(MenuItem.toggle("End items", Material.END_STONE,
+                    List.of("Allow end-only items as targets."),
+                    manager::includeEnd, manager::setIncludeEnd));
+
+            menu.add(MenuItem.toggle("TP to spawn on win", Material.ENDER_PEARL,
+                    List.of("Teleport everyone to spawn on a win."),
+                    manager::tpSpawnOnWin, manager::setTpSpawnOnWin));
+        });
+    }
+
+    private String roundLine() {
+        if (manager.isRolling()) {
+            return "Rolling...";
+        }
         if (manager.isRunning()) {
+            String action = manager.mode() == FirstToManager.Mode.CRAFT ? "craft" : "obtain";
+            return "First to " + action + " " + FirstToManager.prettyName(manager.target());
+        }
+        return "Idle";
+    }
+
+    private void startRound(CommandSender sender, FirstToManager.Mode mode) {
+        if (manager.isRunning() || manager.isRolling()) {
             Messages.send(sender, "firstto.already-running");
             return;
         }
@@ -120,59 +168,6 @@ public final class FirstToCommand implements CommandExecutor, TabCompleter {
                 "nether", manager.includeNether() ? "on" : "off",
                 "end", manager.includeEnd() ? "on" : "off",
                 "tpspawn", manager.tpSpawnOnWin() ? "on" : "off");
-    }
-
-    private void showMenu(CommandSender sender) {
-        sender.sendMessage(Component.text("--- ", NamedTextColor.DARK_GRAY)
-                .append(Component.text("First To", NamedTextColor.GOLD, TextDecoration.BOLD))
-                .append(Component.text(" ---", NamedTextColor.DARK_GRAY)));
-
-        Component round;
-        if (manager.isRolling()) {
-            round = Component.text("ROLLING...", NamedTextColor.YELLOW, TextDecoration.BOLD);
-        } else if (manager.isRunning()) {
-            String action = manager.mode() == FirstToManager.Mode.CRAFT ? "craft" : "obtain";
-            round = Component.text("first to " + action + " ", NamedTextColor.GREEN)
-                    .append(Component.text(FirstToManager.prettyName(manager.target()),
-                            NamedTextColor.YELLOW, TextDecoration.BOLD));
-        } else {
-            round = Component.text("IDLE", NamedTextColor.GRAY, TextDecoration.BOLD);
-        }
-        sender.sendMessage(Component.text("Round: ", NamedTextColor.GRAY).append(round));
-
-        sender.sendMessage(Component.text("  ")
-                .append(button("[Craft Round]", NamedTextColor.GREEN, "/firstto craft",
-                        "Roll a craftable item, first to craft it wins"))
-                .append(Component.text("  "))
-                .append(button("[Obtain Round]", NamedTextColor.AQUA, "/firstto obtain",
-                        "Roll any survival item, first to get one wins"))
-                .append(Component.text("  "))
-                .append(button("[Stop]", NamedTextColor.RED, "/firstto stop",
-                        "Cancel the current round")));
-
-        sender.sendMessage(toggleLine("Nether items", manager.includeNether(), "nether",
-                "Allow nether-only items as targets"));
-        sender.sendMessage(toggleLine("End items", manager.includeEnd(), "end",
-                "Allow end-only items as targets"));
-        sender.sendMessage(toggleLine("TP to spawn on win", manager.tpSpawnOnWin(), "tpspawn",
-                "Teleport everyone to spawn when someone wins"));
-    }
-
-    private Component toggleLine(String name, boolean state, String setting, String hover) {
-        return Component.text(name + ": ", NamedTextColor.GRAY)
-                .append(state
-                        ? Component.text("ON", NamedTextColor.GREEN, TextDecoration.BOLD)
-                        : Component.text("OFF", NamedTextColor.RED, TextDecoration.BOLD))
-                .append(Component.text("  "))
-                .append(state
-                        ? button("[Turn off]", NamedTextColor.RED, "/firstto set " + setting + " off", hover)
-                        : button("[Turn on]", NamedTextColor.GREEN, "/firstto set " + setting + " on", hover));
-    }
-
-    private Component button(String label, NamedTextColor color, String command, String hover) {
-        return Component.text(label, color, TextDecoration.BOLD)
-                .hoverEvent(HoverEvent.showText(Component.text(hover)))
-                .clickEvent(ClickEvent.runCommand(command));
     }
 
     @Override

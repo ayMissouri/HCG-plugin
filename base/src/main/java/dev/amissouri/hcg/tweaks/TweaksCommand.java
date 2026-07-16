@@ -6,8 +6,6 @@ import java.util.Locale;
 
 import dev.amissouri.hcg.Messages;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.command.Command;
@@ -73,26 +71,14 @@ public final class TweaksCommand implements CommandExecutor, TabCompleter {
                 .append(Component.text("Tweaks", NamedTextColor.GOLD, TextDecoration.BOLD))
                 .append(Component.text(" ---", NamedTextColor.DARK_GRAY)));
         for (Tweak tweak : manager.all()) {
-            boolean on = tweak.isEnabled();
             sender.sendMessage(Component.text(tweak.displayName() + ": ", NamedTextColor.GRAY)
-                    .append(on
+                    .append(tweak.isEnabled()
                             ? Component.text("ENABLED", NamedTextColor.GREEN, TextDecoration.BOLD)
-                            : Component.text("DISABLED", NamedTextColor.RED, TextDecoration.BOLD))
-                    .append(Component.text("  "))
-                    .append(button(on ? "[Disable]" : "[Enable]",
-                            on ? NamedTextColor.RED : NamedTextColor.GREEN,
-                            "/tweaks " + tweak.id() + (on ? " off" : " on"),
-                            "Turn " + tweak.displayName() + (on ? " off" : " on")))
-                    .append(Component.text("  "))
-                    .append(button("[Settings]", NamedTextColor.AQUA, tweak.command(),
-                            "Open " + tweak.displayName() + "'s own menu")));
+                            : Component.text("DISABLED", NamedTextColor.RED, TextDecoration.BOLD)));
         }
-    }
-
-    private Component button(String label, NamedTextColor color, String command, String hover) {
-        return Component.text(label, color, TextDecoration.BOLD)
-                .hoverEvent(HoverEvent.showText(Component.text(hover)))
-                .clickEvent(ClickEvent.runCommand(command));
+        sender.sendMessage(Component.text("Toggle with /tweaks <tweak> <on|off>, "
+                + "or open the chest menu in-game with /tweaks.", NamedTextColor.DARK_GRAY)
+                .decorate(TextDecoration.ITALIC));
     }
 
     private static String state(boolean enabled) {
