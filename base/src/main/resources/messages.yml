@@ -167,3 +167,10 @@ tweaks:
     setting-set: "&a{setting} set to {value}."
     bad-value: "&cUnknown value '{input}', use one of: {options}."
     reloaded: "&aVoid Totem settings reloaded from config.yml."
+
+  pathsprint:
+    name: "Path Sprint"
+    summary: "Paths give you a little speed boost while you run on them."
+    setting-set: "&a{setting} set to {value}."
+    bad-value: "&cUnknown value '{input}', use one of: {options}."
+    reloaded: "&aPath Sprint settings reloaded from config.yml."

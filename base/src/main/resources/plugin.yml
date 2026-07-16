@@ -41,6 +41,10 @@ commands:
     usage: /<command> [on|off|harvest|replant|xp|xpamount|hoe|durability|radius|sound|twerk|twerkradius|twerkchance|gui|reload]
     aliases: [farm]
     permission: hcg.farming
+  pathsprint:
+    description: Manage the Path Sprint tweak.
+    usage: /<command> [on|off|speed|sprint|particles|gui|reload]
+    permission: hcg.pathsprint
   flyspeed:
     description: Set your fly speed (1-10, default 1).
     usage: /<command> <1-10>
@@ -187,6 +191,11 @@ permissions:
     default: op
   hcg.farming.use:
     description: Lets a player right-click harvest and auto-replant crops while the tweak is on.
+    default: true
+  hcg.pathsprint:
+    default: op
+  hcg.pathsprint.use:
+    description: Lets a player get a speed boost while running on paths while the tweak is on.
     default: true
   hcg.flyspeed:
     default: op

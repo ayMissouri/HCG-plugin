@@ -177,3 +177,14 @@ tweaks:
     effect: true
     # How long the rescue levitation lasts.
     max-seconds: 30
+
+  # A little speed boost while you run along paths.
+  pathsprint:
+    enabled: false
+
+    # Strength of the speed boost while running on a path (1-3).
+    speed: 1
+    # Only boost while the player is sprinting. false speeds up plain walking on a path too.
+    require-sprint: true
+    # Show the speed particle trail while the boost is active.
+    particles: false

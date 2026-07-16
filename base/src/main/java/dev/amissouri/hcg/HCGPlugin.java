@@ -10,6 +10,9 @@ import dev.amissouri.hcg.tweaks.FarmingTweak;
 import dev.amissouri.hcg.tweaks.MobHealthCommand;
 import dev.amissouri.hcg.tweaks.MobHealthListener;
 import dev.amissouri.hcg.tweaks.MobHealthTweak;
+import dev.amissouri.hcg.tweaks.PathSprintCommand;
+import dev.amissouri.hcg.tweaks.PathSprintListener;
+import dev.amissouri.hcg.tweaks.PathSprintTweak;
 import dev.amissouri.hcg.tweaks.TreecapitatorCommand;
 import dev.amissouri.hcg.tweaks.TreecapitatorListener;
 import dev.amissouri.hcg.tweaks.TreecapitatorTweak;
@@ -121,6 +124,10 @@ public final class HCGPlugin extends JavaPlugin {
         VoidTotemTweak voidTotem = new VoidTotemTweak(this);
         tweaks.register(voidTotem);
 
+        PathSprintTweak pathSprint = new PathSprintTweak(this);
+        tweaks.register(pathSprint);
+        PathSprintListener pathSprintListener = new PathSprintListener(pathSprint, scheduler);
+
         getServer().getPluginManager().registerEvents(new TweaksGuiListener(gui), this);
         getServer().getPluginManager().registerEvents(
                 new VeinminerListener(veinminer, veinEnchant, scheduler), this);
@@ -130,7 +137,9 @@ public final class HCGPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(mobHealthListener, this);
         getServer().getPluginManager().registerEvents(new XpTpListener(xpTp, scheduler), this);
         getServer().getPluginManager().registerEvents(new VoidTotemListener(voidTotem, scheduler), this);
+        getServer().getPluginManager().registerEvents(pathSprintListener, this);
         mobHealthListener.startAll();
+        pathSprintListener.startAll();
 
         register("tweaks", new TweaksCommand(tweaks, gui));
         register("veinminer", new VeinminerCommand(veinminer, veinEnchant, gui, scheduler));
@@ -139,6 +148,7 @@ public final class HCGPlugin extends JavaPlugin {
         register("mobhealth", new MobHealthCommand(mobHealth, gui));
         register("xptp", new XpTpCommand(xpTp, gui));
         register("voidtotem", new VoidTotemCommand(voidTotem, gui));
+        register("pathsprint", new PathSprintCommand(pathSprint, gui));
     }
 
     @Override
@@ -206,7 +216,13 @@ public final class HCGPlugin extends JavaPlugin {
                 new Entry("/voidtotem consume <on|off>",
                         "Use up the totem on each save, or make a held totem unlimited protection."),
                 new Entry("/voidtotem effect <on|off>",
-                        "Play the totem's pop animation and sound when it saves you.")));
+                        "Play the totem's pop animation and sound when it saves you."),
+                new Entry("/pathsprint", "Open the Path Sprint chest menu (paths give a speed boost)."),
+                new Entry("/pathsprint speed <1-3>", "How much faster you run on a path."),
+                new Entry("/pathsprint sprint <on|off>",
+                        "Only boost while sprinting, or while walking on a path too."),
+                new Entry("/pathsprint particles <on|off>",
+                        "Show the speed particle trail while the boost is active.")));
 
         HelpRegistry.register("Admin Commands", HelpRegistry.ORDER_ADMIN, List.of(
                 new Entry("/hcg help [category]", "Show this help menu."),
