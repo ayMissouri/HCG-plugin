@@ -4,6 +4,9 @@ import java.util.List;
 
 import dev.amissouri.hcg.HelpRegistry.Entry;
 import dev.amissouri.hcg.menu.MenuListener;
+import dev.amissouri.hcg.tweaks.FarmingCommand;
+import dev.amissouri.hcg.tweaks.FarmingListener;
+import dev.amissouri.hcg.tweaks.FarmingTweak;
 import dev.amissouri.hcg.tweaks.MobHealthCommand;
 import dev.amissouri.hcg.tweaks.MobHealthListener;
 import dev.amissouri.hcg.tweaks.MobHealthTweak;
@@ -102,6 +105,9 @@ public final class HCGPlugin extends JavaPlugin {
         TreecapitatorTweak treecapitator = new TreecapitatorTweak(this, treeEnchant, scheduler);
         tweaks.register(treecapitator);
 
+        FarmingTweak farming = new FarmingTweak(this);
+        tweaks.register(farming);
+
         MobHealthTweak mobHealth = new MobHealthTweak(this);
         tweaks.register(mobHealth);
         mobHealthListener = new MobHealthListener(this, mobHealth, scheduler);
@@ -114,6 +120,7 @@ public final class HCGPlugin extends JavaPlugin {
                 new VeinminerListener(veinminer, veinEnchant, scheduler), this);
         getServer().getPluginManager().registerEvents(
                 new TreecapitatorListener(treecapitator, treeEnchant, scheduler), this);
+        getServer().getPluginManager().registerEvents(new FarmingListener(farming), this);
         getServer().getPluginManager().registerEvents(mobHealthListener, this);
         getServer().getPluginManager().registerEvents(new XpTpListener(xpTp, scheduler), this);
         mobHealthListener.startAll();
@@ -121,6 +128,7 @@ public final class HCGPlugin extends JavaPlugin {
         register("tweaks", new TweaksCommand(tweaks, gui));
         register("veinminer", new VeinminerCommand(veinminer, veinEnchant, gui, scheduler));
         register("treecapitator", new TreecapitatorCommand(treecapitator, treeEnchant, gui, scheduler));
+        register("farming", new FarmingCommand(farming, gui));
         register("mobhealth", new MobHealthCommand(mobHealth, gui));
         register("xptp", new XpTpCommand(xpTp, gui));
     }
@@ -158,6 +166,18 @@ public final class HCGPlugin extends JavaPlugin {
                 new Entry("/treecapitator size <1-4096>", "Most extra logs one break may fell."),
                 new Entry("/treecapitator grant|remove [player]",
                         "Add or remove the Treecapitator enchant on a held axe."),
+                new Entry("/farming", "Open the Farming chest menu (right-click to harvest and replant crops)."),
+                new Entry("/farming harvest <on|off>",
+                        "Right-click a grown crop to harvest and replant it in place."),
+                new Entry("/farming replant <on|off>",
+                        "Replant a grown crop when it's broken, paid for from its own drops."),
+                new Entry("/farming xp <on|off>", "Grant experience when a crop is harvested."),
+                new Entry("/farming radius <0-8>",
+                        "Right-click harvest every grown crop within this many blocks."),
+                new Entry("/farming hoe|durability <on|off>",
+                        "Require a hoe to right-click harvest, and whether it wears the hoe down."),
+                new Entry("/farming twerk <on|off>",
+                        "TwerkGrow: spam-sneak to nudge nearby crops up a growth stage now and then."),
                 new Entry("/mobhealth", "Open the Mob Health Display chest menu (see mob health on look)."),
                 new Entry("/mobhealth display <above-mob|action-bar>",
                         "Show health floating over the mob, or above the hotbar."),

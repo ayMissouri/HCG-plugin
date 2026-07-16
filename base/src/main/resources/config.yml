@@ -135,3 +135,32 @@ tweaks:
     blocks: true
     # Send killed players' XP straight to the killer.
     include-players: false
+
+  farming:
+    enabled: false
+
+    # Right-click a grown crop to harvest it and replant it. One seed is kept back to replant, so the yield matches breaking and replanting by hand.
+    right-click-harvest: true
+    # When a grown crop is broken, replant it from its own drops so the field refills itself.
+    replant-on-break: true
+    # Harvesting a grown crop grants experience, like mining an ore.
+    xp: true
+    # How much experience each harvested crop grants.
+    xp-amount: 2
+    # Only right-click harvest while holding a hoe. false means any item or an empty hand works.
+    require-hoe: false
+    # A right-click harvest costs a held hoe one durability point per crop.
+    hoe-durability: false
+    # Right-click harvests every grown crop within this many blocks (0 harvests only the crop clicked).
+    radius: 0
+    # Play a soft sound when a right-click harvest lands.
+    sound: true
+
+    # Spam crouch near your crops and they grow a little, every now and then.
+    twerk-grow:
+      enabled: false
+      radius: 4
+      # Chance (%) that each unripe crop in range advances one growth stage per sneak.
+      chance: 15
+      # Shortest time (ms) between grows for one player.
+      cooldown-ms: 350

@@ -152,3 +152,10 @@ tweaks:
     setting-set: "&a{setting} set to {value}."
     bad-value: "&cUnknown value '{input}', use one of: {options}."
     reloaded: "&aXP Teleport settings reloaded from config.yml."
+
+  farming:
+    name: "Farming"
+    summary: "Right-click to harvest and replant crops in one go."
+    setting-set: "&a{setting} set to {value}."
+    bad-value: "&cUnknown value '{input}', use one of: {options}."
+    reloaded: "&aFarming settings reloaded from config.yml."

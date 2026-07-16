@@ -32,6 +32,11 @@ commands:
     description: Manage the XP Teleport tweak.
     usage: /<command> [on|off|mending|sound|blocks|players|gui|reload]
     permission: hcg.xptp
+  farming:
+    description: Manage the Farming tweak.
+    usage: /<command> [on|off|harvest|replant|xp|xpamount|hoe|durability|radius|sound|twerk|twerkradius|twerkchance|gui|reload]
+    aliases: [farm]
+    permission: hcg.farming
   flyspeed:
     description: Set your fly speed (1-10, default 1).
     usage: /<command> <1-10>
@@ -168,6 +173,11 @@ permissions:
     default: op
   hcg.xptp.use:
     description: Lets a player's kills and mining send their XP straight to them while the tweak is on.
+    default: true
+  hcg.farming:
+    default: op
+  hcg.farming.use:
+    description: Lets a player right-click harvest and auto-replant crops while the tweak is on.
     default: true
   hcg.flyspeed:
     default: op
