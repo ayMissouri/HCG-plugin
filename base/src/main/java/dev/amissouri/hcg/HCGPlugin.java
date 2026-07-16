@@ -4,6 +4,9 @@ import java.util.List;
 
 import dev.amissouri.hcg.HelpRegistry.Entry;
 import dev.amissouri.hcg.menu.MenuListener;
+import dev.amissouri.hcg.tweaks.MobHealthCommand;
+import dev.amissouri.hcg.tweaks.MobHealthListener;
+import dev.amissouri.hcg.tweaks.MobHealthTweak;
 import dev.amissouri.hcg.tweaks.TreecapitatorCommand;
 import dev.amissouri.hcg.tweaks.TreecapitatorListener;
 import dev.amissouri.hcg.tweaks.TreecapitatorTweak;
@@ -27,6 +30,7 @@ public final class HCGPlugin extends JavaPlugin {
 
     private FreezeManager freezeManager;
     private VanishManager vanishManager;
+    private MobHealthListener mobHealthListener;
 
     @Override
     public void onEnable() {
@@ -95,15 +99,29 @@ public final class HCGPlugin extends JavaPlugin {
         TreecapitatorTweak treecapitator = new TreecapitatorTweak(this, treeEnchant, scheduler);
         tweaks.register(treecapitator);
 
+        MobHealthTweak mobHealth = new MobHealthTweak(this);
+        tweaks.register(mobHealth);
+        mobHealthListener = new MobHealthListener(this, mobHealth, scheduler);
+
         getServer().getPluginManager().registerEvents(new TweaksGuiListener(gui), this);
         getServer().getPluginManager().registerEvents(
                 new VeinminerListener(veinminer, veinEnchant, scheduler), this);
         getServer().getPluginManager().registerEvents(
                 new TreecapitatorListener(treecapitator, treeEnchant, scheduler), this);
+        getServer().getPluginManager().registerEvents(mobHealthListener, this);
+        mobHealthListener.startAll();
 
         register("tweaks", new TweaksCommand(tweaks, gui));
         register("veinminer", new VeinminerCommand(veinminer, veinEnchant, gui, scheduler));
         register("treecapitator", new TreecapitatorCommand(treecapitator, treeEnchant, gui, scheduler));
+        register("mobhealth", new MobHealthCommand(mobHealth, gui));
+    }
+
+    @Override
+    public void onDisable() {
+        if (mobHealthListener != null) {
+            mobHealthListener.shutdown();
+        }
     }
 
     private void registerHelp() {
@@ -131,7 +149,14 @@ public final class HCGPlugin extends JavaPlugin {
                         "Fast leaf decay, and replanting a sapling where the trunk stood."),
                 new Entry("/treecapitator size <1-4096>", "Most extra logs one break may fell."),
                 new Entry("/treecapitator grant|remove [player]",
-                        "Add or remove the Treecapitator enchant on a held axe.")));
+                        "Add or remove the Treecapitator enchant on a held axe."),
+                new Entry("/mobhealth", "Open the Mob Health Display chest menu (see mob health on look)."),
+                new Entry("/mobhealth display <above-mob|action-bar>",
+                        "Show health floating over the mob, or above the hotbar."),
+                new Entry("/mobhealth style <hearts|numbers|both>",
+                        "Draw the health as hearts, numbers, or both."),
+                new Entry("/mobhealth range <1-32>", "How far away a looked-at mob still shows health."),
+                new Entry("/mobhealth players <on|off>", "Also show other players' health.")));
 
         HelpRegistry.register("Admin Commands", HelpRegistry.ORDER_ADMIN, List.of(
                 new Entry("/hcg help [category]", "Show this help menu."),

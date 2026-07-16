@@ -138,3 +138,10 @@ tweaks:
     removed: "&aRemoved {name} from {player}'s held item."
     not-enchantable: "&cTreecapitator can't go on that item (see enchant.tools in config.yml)."
     not-enchanted: "&eThat item doesn't have Treecapitator."
+
+  mobhealth:
+    name: "Mob Health Display"
+    summary: "See a mob's health while you look at it."
+    setting-set: "&a{setting} set to {value}."
+    bad-value: "&cUnknown value '{input}', use one of: {options}."
+    reloaded: "&aMob Health Display settings reloaded from config.yml."

@@ -107,3 +107,18 @@ tweaks:
     # When this list is absent, every log and wood block counts.
     # blocks:
     #   - OAK_LOG
+
+  mobhealth:
+    enabled: false
+
+    # Where the health shows while a player looks at a mob:
+    #   above-mob  - a floating health bar over the mob.
+    #   action-bar - text above the looking player's hotbar.
+    display: above-mob
+    # How the health is drawn:
+    #   hearts  - ten hearts that empty as the mob loses health
+    #   numbers - 12.5/20
+    #   both    - hearts and numbers
+    style: both
+    range: 12
+    include-players: false

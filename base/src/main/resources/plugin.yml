@@ -24,6 +24,10 @@ commands:
     usage: /<command> [on|off|mode|scope|animation|decay|replant|leaves|axe|hunger|durability|size|sneak|chance|minlevel|grant|remove|gui|reload]
     aliases: [treecap]
     permission: hcg.treecapitator
+  mobhealth:
+    description: Manage the Mob Health Display tweak.
+    usage: /<command> [on|off|display|style|range|players|gui|reload]
+    permission: hcg.mobhealth
   flyspeed:
     description: Set your fly speed (1-10, default 1).
     usage: /<command> <1-10>
@@ -150,6 +154,11 @@ permissions:
     default: op
   hcg.treecapitator.use:
     description: Lets a player fell trees while the tweak is on.
+    default: true
+  hcg.mobhealth:
+    default: op
+  hcg.mobhealth.use:
+    description: Lets a player see mob health while the tweak is on.
     default: true
   hcg.flyspeed:
     default: op
